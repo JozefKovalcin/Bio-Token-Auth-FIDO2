@@ -1,0 +1,6 @@
+* text=auto
+*.md text eol=lf
+*.ts text eol=lf
+*.tsx text eol=lf
+*.kt text eol=lf
+*.yaml text eol=lf

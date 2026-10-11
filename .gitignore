@@ -1,0 +1,16 @@
+node_modules/
+dist/
+build/
+coverage/
+.gradle/
+.idea/
+local.properties
+*.jks
+*.keystore
+.env
+.env.*
+!.env.example
+*.log
+infra/data/
+.DS_Store
+Thumbs.db
