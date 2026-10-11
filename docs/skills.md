@@ -1,24 +1,31 @@
 # Projektové skilly
 
-Požadované zdroje a účel:
+Web/API skilly: vercel-react-best-practices, nestjs-best-practices, prisma-orm-setup, supabase-postgres-best-practices.
 
-| Zdroj | Skill | Použitie |
-| --- | --- | --- |
-| vercel-labs/agent-skills | vercel-react-best-practices | React výkon a štruktúra |
-| Kadajett/agent-nestjs-skills | nestjs-best-practices | NestJS moduly a bezpečnosť |
-| prisma/skills | prisma-orm-setup | Prisma konfigurácia a migrácie |
-| supabase/agent-skills | supabase-postgres-best-practices | PostgreSQL návrh a výkon |
-| ashtanko/compose-android-template | compose-state-holder-ui-split | Compose UI / state holders |
-| ashtanko/compose-android-template | kotlin-flow-state-event-modeling | Kotlin Flow, stav a udalosti |
+Android skilly z ashtanko/compose-android-template:
 
-Inštalácia je projektová pre agenta Codex cez `npx skills add <zdroj> --skill <názov> --agent codex --yes`. Posledné dva skilly možno nainštalovať jedným príkazom s oboma názvami. Používajte projektové SKILL.md, nevkladajte inštaláciu do CI. Verzie zdrojov eviduje skills CLI lockfile, ak ho generuje.
+- compose-state-holder-ui-split: oddelenie UI a state holdera.
+- kotlin-flow-state-event-modeling: Flow, stav a udalosti.
+- add-android-module: pridávanie modulov.
+- deliver-android-feature: implementácia funkcie a dôkazy správnosti.
+- verify-android-change: primerané overovanie.
 
-## Skutočný stav inštalácie
+## Aktualizácia
 
-Všetkých šesť požadovaných skillov je uložených v `.agents/skills/`. Prvé štyri nainštaloval skills CLI a eviduje ich `skills-lock.json`.
+Zdroj overený 2026-10-11 na commite `510e52b62464e8663c33706ea35eb81b432bd33e`. Pôvodné dva skilly existujú aj tu a oproti historickému commitu `a69c8db62c0d27ad42fe57f57396aab06e13eb84` sa obsahovo nezmenili. Pôvodná informácia o odstránení bola nepresná: skills CLI ich neuvádza medzi objavenými skillmi.
 
-Android skilly už aktuálna vetva zdroja pod pôvodnými názvami neponúka. Oba boli obnovené bez úprav z commitu `a69c8db62c0d27ad42fe57f57396aab06e13eb84` repozitára `ashtanko/compose-android-template`, z ciest `.agents/skills/compose-state-holder-ui-split` a `.agents/skills/kotlin-flow-state-event-modeling`. Inštaláciu vykonal systémový skill-installer s explicitným `--ref` a projektovým `--dest`; nie sú evidované v CLI lockfile. Presný zdroj a kontrolné súčty sú v `docs/android-skills-provenance.json`.
+Tri workflow skilly boli nainštalované projektovo pre Codex:
 
-Relatívne odkazy Android skillov na ďalšie súvisiace skilly nie sú automaticky nainštalované. Pri potrebe ich použitia načítajte zdroj z rovnakého commitu; nenahrádzajte ich odlišnými pokynmi bez kontroly.
+```powershell
+npx --yes skills add ashtanko/compose-android-template --skill add-android-module deliver-android-feature verify-android-change --agent codex --yes
+```
 
-Pri príprave sa použili pravidlá NestJS feature modulov, Compose UI/state-holder split, explicitného Flow stavu a krátkych databázových transakcií. React/Prisma implementácia je ďalšia etapa. Prisma skill vyžaduje pri implementácii overiť podporovanú publikovanú verziu a načítať jej pokyny; samotná inštalácia skillu nie je ORM setup.
+Sedem CLI inštalácií eviduje `skills-lock.json`. Dva manuálne inštalované skilly a aktuálny zdroj všetkých piatich Android skillov eviduje `android-skills-provenance.json`. Všetkých deväť skillov je v `.agents/skills/`.
+
+## Použitie
+
+Pred Android prácou načítajte `.agents/README.md` a relevantné `.agents/reference/` dokumenty. Nové skilly predpokladajú plný upstream Android template. Tento projekt zatiaľ nemá generátor modulov, Gradle wrapper, convention plugins ani Makefile. Nespúšťajte neexistujúce príkazy a nepreberajte template balíky ako fakty projektu.
+
+Referencie sú projektové, nie kópie upstream template. Ďalšie focused skilly spomínané v pokynoch nie sú automaticky nainštalované; pri potrebe načítajte zdroj z evidovaného commitu.
+
+React/Prisma implementácia je ďalšia etapa. Pri Prisma setup overte publikovanú podporovanú verziu a načítajte jej pokyny; inštalácia skillu nie je ORM setup.

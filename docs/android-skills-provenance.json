@@ -1,17 +1,33 @@
 {
   "source": "https://github.com/ashtanko/compose-android-template",
-  "commit": "a69c8db62c0d27ad42fe57f57396aab06e13eb84",
-  "installer": "system skill-installer",
+  "commit": "510e52b62464e8663c33706ea35eb81b432bd33e",
+  "verifiedOn": "2026-10-11",
+  "hashNormalization": "LF",
   "skills": [
     {
       "name": "compose-state-holder-ui-split",
-      "path": ".agents\\skills\\compose-state-holder-ui-split\\SKILL.md",
-      "sha256": "53df7528b7f60aad5f1f9e774a8e5617c86a28ae0af961939ec5fad1c99c886c"
+      "path": ".agents/skills/compose-state-holder-ui-split/SKILL.md",
+      "sha256Lf": "53df7528b7f60aad5f1f9e774a8e5617c86a28ae0af961939ec5fad1c99c886c"
     },
     {
       "name": "kotlin-flow-state-event-modeling",
-      "path": ".agents\\skills\\kotlin-flow-state-event-modeling\\SKILL.md",
-      "sha256": "d3a7fb86545774cfc6b674d5c84cdb6852b822f0f18887559bcc35653b867959"
+      "path": ".agents/skills/kotlin-flow-state-event-modeling/SKILL.md",
+      "sha256Lf": "d3a7fb86545774cfc6b674d5c84cdb6852b822f0f18887559bcc35653b867959"
+    },
+    {
+      "name": "add-android-module",
+      "path": ".agents/skills/add-android-module/SKILL.md",
+      "sha256Lf": "8c36ed7f88628b4042e9fe54f090511db14ca4d911795353666fa915225d2a5e"
+    },
+    {
+      "name": "deliver-android-feature",
+      "path": ".agents/skills/deliver-android-feature/SKILL.md",
+      "sha256Lf": "5997aed0c5fe7405b5828bce1fb702234b32658113eaa3f90f23ca7083468201"
+    },
+    {
+      "name": "verify-android-change",
+      "path": ".agents/skills/verify-android-change/SKILL.md",
+      "sha256Lf": "91cde4294f833783ac4b0d56454e09d4900cdca9cd0137bc5b320891ed1b41b6"
     }
   ]
 }

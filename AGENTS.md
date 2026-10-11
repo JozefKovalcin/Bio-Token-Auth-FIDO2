@@ -30,3 +30,5 @@
 ## Projektové skilly
 
 Pozri `docs/skills.md`; inštalované zdroje hľadajte v `.agents/skills/` a prípadných Codex odkazoch `.codex/skills/`.
+
+Pre Android načítajte `.agents/README.md` a projektové referencie. Aktuálne workflow skilly predpokladajú upstream template nástroje; v našom scaffolde zatiaľ nie sú dostupné. Používajte iba reálne existujúce tasky a zachovajte projektové požiadavky.

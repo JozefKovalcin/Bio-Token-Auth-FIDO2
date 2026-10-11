@@ -1,6 +1,18 @@
 {
   "version": 1,
   "skills": {
+    "add-android-module": {
+      "source": "ashtanko/compose-android-template",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/add-android-module/SKILL.md",
+      "computedHash": "a82d0a2c05f2b5807251ef81e3ec029ddaff7cf26eb7f141a4e72c0974aacf9f"
+    },
+    "deliver-android-feature": {
+      "source": "ashtanko/compose-android-template",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/deliver-android-feature/SKILL.md",
+      "computedHash": "04e7c3422b2446994b25b14c12933b528bda9cbd3c580bc9fb3771bd7cf8fc1b"
+    },
     "nestjs-best-practices": {
       "source": "Kadajett/agent-nestjs-skills",
       "sourceType": "github",
@@ -24,6 +36,12 @@
       "sourceType": "github",
       "skillPath": "skills/react-best-practices/SKILL.md",
       "computedHash": "c1b82af3b85e44c3ad43b9ddcf256303dc52c68694bba143d50438ac8c4e1b92"
+    },
+    "verify-android-change": {
+      "source": "ashtanko/compose-android-template",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/verify-android-change/SKILL.md",
+      "computedHash": "19c0e580f364db02238845bac87a99e0f268120c0ec1e18915c9894532baaa18"
     }
   }
 }
