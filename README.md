@@ -32,7 +32,3 @@ Repozitár obsahuje dokumentáciu, adresárovú štruktúru a projektové skilly
 - [Model hrozieb](docs/threat-model.md)
 - [Overenie a etapy](docs/testing.md)
 - [Skilly](docs/skills.md)
-
-## Práca s Gitom
-
-Stabilná vetva je `main`. Zmeny robte v krátkych vetvách `feat/...`, `fix/...` alebo `docs/...`. Commity majú opisovať jednu ucelenú zmenu. Pred commitom skontrolujte diff a tajomstvá. Repozitár nie je automaticky publikovaný na GitHub.
