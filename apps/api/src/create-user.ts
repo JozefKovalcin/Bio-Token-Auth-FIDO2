@@ -15,6 +15,6 @@ try {
   const user = await new AuthService(db).createUser(username, password);
   console.log(`Účet ${user.username} je vytvorený. TOTP možno zapnúť po prihlásení.`);
 } catch {
-  console.error('Účet sa nepodarilo vytvoriť. Overte jedinečné meno (3–64 znakov), heslo (12–128 znakov) a databázu.');
+  console.error('Účet sa nepodarilo vytvoriť. Overte jedinečné meno (3–64 znakov), heslo (8–128 znakov) a databázu.');
   process.exitCode = 1;
 } finally { await db.$disconnect(); }

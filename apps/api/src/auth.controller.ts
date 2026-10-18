@@ -18,7 +18,7 @@ export class AuthController {
   @Get('health') health() { return { status: 'ok', modes: ['A'] }; }
   @Post('auth/register') async register(@Body() body: unknown, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const username = field(body, 'username', /^[a-z0-9][a-z0-9._-]{2,63}$/, 64);
-    const password = field(body, 'password', /^[\s\S]{12,128}$/, 128);
+    const password = field(body, 'password', /^[\s\S]{8,128}$/, 128);
     const result = await this.auth.register(username, password, req.ip ?? 'unknown', req.cookies[sessionCookie]);
     res.clearCookie(pendingCookie, cookies);
     res.cookie(sessionCookie, result.sessionToken, { ...cookies, expires: result.user.expiresAt });

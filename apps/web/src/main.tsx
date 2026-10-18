@@ -1,11 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Vault } from 'lucide-react';
+import { Eye, EyeOff, Vault } from 'lucide-react';
 import './style.css';
 
 type User = { username: string; mode: string; totpActive: boolean; expiresAt: string };
 type Enrollment = { secret: string; qr: string };
 type View = 'loading' | 'login' | 'register' | 'totp' | 'dashboard' | 'setup';
+const heroLines = ['Dva kroky.', 'Jedno bezpečné', 'prihlásenie.'];
+const heroCharacterCount = heroLines.join('').length;
 class ApiError extends Error { constructor(message: string, public status: number) { super(message); } }
 async function api<T>(path: string, data?: object): Promise<T> {
   let response: Response;
@@ -24,6 +26,8 @@ function App() {
   const [view, setView] = useState<View>('loading');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [passwordConfirm, setPasswordConfirm] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [code, setCode] = useState('');
   const [enrollment, setEnrollment] = useState<Enrollment | null>(null);
   const [user, setUser] = useState<User | null>(null);
@@ -31,8 +35,51 @@ function App() {
   const [error, setError] = useState('');
   const [expiresAt, setExpiresAt] = useState(0);
   const [remaining, setRemaining] = useState(0);
+  const [heroCharacters, setHeroCharacters] = useState(0);
   const title = useRef<HTMLHeadingElement>(null);
   const initialViewResolved = useRef(false);
+
+  useEffect(() => {
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+    if (reduceMotion.matches) return;
+    let frame = 0;
+    const updateVaultDepth = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const maxScroll = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+        const progress = Math.min(window.scrollY / maxScroll, 1);
+        document.documentElement.style.setProperty('--vault-shift', `${-24 * progress}px`);
+      });
+    };
+    window.addEventListener('scroll', updateVaultDepth, { passive: true });
+    updateVaultDepth();
+    return () => {
+      window.removeEventListener('scroll', updateVaultDepth);
+      cancelAnimationFrame(frame);
+      document.documentElement.style.removeProperty('--vault-shift');
+    };
+  }, []);
+
+  useEffect(() => {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      setHeroCharacters(heroCharacterCount);
+      return;
+    }
+    let count = 0;
+    let timer = 0;
+    const typeNextCharacter = () => {
+      count += 1;
+      setHeroCharacters(count);
+      if (count < heroCharacterCount) {
+        const lineBreak = heroLines.slice(0, -1).reduce((sum, line) => sum + line.length, 0);
+        const secondLineBreak = lineBreak + heroLines[1].length;
+        const pause = count === lineBreak || count === secondLineBreak ? 120 : 30;
+        timer = window.setTimeout(typeNextCharacter, pause);
+      }
+    };
+    timer = window.setTimeout(typeNextCharacter, 280);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -62,14 +109,19 @@ function App() {
   }, [view, expiresAt]);
 
   async function submit(event: React.FormEvent) {
-    event.preventDefault(); setBusy(true); setError('');
+    event.preventDefault();
+    if (view === 'register' && password !== passwordConfirm) {
+      setError('Zadané heslá sa nezhodujú. Skontrolujte ich a skúste znova.');
+      return;
+    }
+    setBusy(true); setError('');
     try {
       if (view === 'register') {
         const value = await api<User>('register', { username, password });
-        setPassword(''); setUser(value); setExpiresAt(Date.parse(value.expiresAt)); setView('dashboard');
+        setPassword(''); setPasswordConfirm(''); setShowPassword(false); setUser(value); setExpiresAt(Date.parse(value.expiresAt)); setView('dashboard');
       } else if (view === 'login') {
         const result = await api<{ step: 'totp' | 'done'; expiresAt?: string; user?: User }>('password', { username, password });
-        setPassword('');
+        setPassword(''); setShowPassword(false);
         if (result.step === 'totp') { setExpiresAt(Date.parse(result.expiresAt!)); setView('totp'); }
         else { setUser(result.user!); setExpiresAt(Date.parse(result.user!.expiresAt)); setView('dashboard'); }
       } else if (view === 'totp') {
@@ -99,7 +151,7 @@ function App() {
   async function logout() {
     setBusy(true); setError('');
     try {
-      await api('logout', {}); setUser(null); setEnrollment(null); setCode(''); setPassword(''); setView('login');
+      await api('logout', {}); setUser(null); setEnrollment(null); setCode(''); setPassword(''); setPasswordConfirm(''); setShowPassword(false); setView('login');
     } catch (e) { setError(e instanceof Error ? e.message : 'Odhlásenie sa nepodarilo. Skúste znova.'); }
     finally { setBusy(false); }
   }
@@ -110,43 +162,60 @@ function App() {
   const firstComplete = second || view === 'dashboard';
   const secondCurrent = second;
   const secondComplete = view === 'dashboard' && Boolean(user?.totpActive);
-  return <div className="shell">
+  return <><a className="skip" href="#auth-title">Prejsť na formulár</a><div className="shell">
     <aside className="visual">
-      <a className="brand" href="/" aria-label="Bio Token Auth – domov"><span className="brand-mark" aria-hidden="true"><Vault size={44} strokeWidth={1.5}/></span><span className="brand-type">BIO TOKEN<small>AUTH</small></span></a>
+      <a className="brand" href="/" aria-label="Bio Token Auth – domov"><span className="brand-mark" aria-hidden="true"><Vault size={36} strokeWidth={1.6}/></span><span className="brand-type"><span>Bio Token</span><small>Auth</small></span></a>
       <div className="visual-copy">
-        <p className="eyebrow">OVERENIE IDENTITY / REŽIM A</p>
-        <h1><span>Dva kroky.</span><span>Jedno bezpečné</span><span>prihlásenie.</span></h1>
+        <h1 aria-label="Dva kroky. Jedno bezpečné prihlásenie." aria-live="off">{heroLines.map((line, lineIndex) => {
+          const start = heroLines.slice(0, lineIndex).reduce((sum, previous) => sum + previous.length, 0);
+          const visibleCount = Math.max(0, Math.min(line.length, heroCharacters - start));
+          const visible = line.slice(0, visibleCount);
+          const emphasisStart = lineIndex === 1 ? line.indexOf('bezpečné') : -1;
+          const isTyping = heroCharacters > start && visibleCount < line.length;
+          return <span key={line} className="hero-line" aria-hidden="true" data-typing={isTyping || undefined}>
+            {emphasisStart < 0 ? visible : <>{visible.slice(0, emphasisStart)}<em>{visible.slice(emphasisStart, emphasisStart + 'bezpečné'.length)}</em>{visible.slice(emphasisStart + 'bezpečné'.length)}</>}
+          </span>;
+        })}</h1>
+        <div className="photo-footer" data-intro-complete={heroCharacters === heroCharacterCount} aria-label="Dva faktory overenia"><div><span>01</span><p>Heslo</p></div><div><span>02</span><p>Autentifikačná aplikácia</p></div></div>
       </div>
-      <div className="photo-footer" aria-label="Dva faktory overenia"><div><span>01</span><p>Heslo</p></div><div><span>02</span><p>Autentifikačná aplikácia</p></div></div>
     </aside>
     <div className="workspace">
-      <header className="topbar"><span className="mode-tag">REŽIM A <span aria-hidden="true">/</span> HESLO + TOTP</span></header>
+      <header className="topbar"><span className="mode-tag"><strong>Režim A</strong><span>Heslo + TOTP</span></span></header>
       <main className="main">
         <div className="form-wrap">
           <ol className="progress" aria-label="Priebeh overenia">
             <li id="factor-one" className={firstCurrent ? 'current' : firstComplete ? 'complete' : ''} aria-current={firstCurrent ? 'step' : undefined}><span className="step-number">01</span><span>Heslo</span></li>
             <li id="factor-two" className={secondCurrent ? 'current' : secondComplete ? 'complete' : ''} aria-current={secondCurrent ? 'step' : undefined}><span className="step-number">02</span><span>Autentifikátor</span></li>
           </ol>
-          <section className="panel" aria-busy={busy}>
-        <p className="eyebrow">{view === 'dashboard' ? 'VÁŠ ÚČET' : view === 'totp' || view === 'setup' ? 'DRUHÝ KROK' : view === 'register' ? 'REGISTRÁCIA' : 'REŽIM A  /  HESLO + TOTP'}</p>
-        <h2 ref={title} tabIndex={-1}>{view === 'loading' ? 'Načítavam účet…' : heading}</h2>
-        <p className="hint">{view === 'register' ? 'Zvoľte si meno a dlhé heslo. Autentifikátor môžete pridať teraz alebo neskôr v účte.' : view === 'totp' ? 'Otvorte 2FAS, Google Authenticator alebo inú TOTP aplikáciu a zadajte aktuálny šesťmiestny kód.' : view === 'setup' ? 'Naskenujte QR kód v autentifikačnej aplikácii a potvrďte prvý kód.' : view === 'dashboard' ? 'Vyberte si, ako chcete chrániť svoj účet.' : 'Zadajte svoje meno a heslo.'}</p>
+          <section className="panel" aria-busy={busy} aria-labelledby="auth-title">
+        <h2 id="auth-title" ref={title} tabIndex={-1}>{view === 'loading' ? 'Načítavam účet…' : heading}</h2>
+        <p className="hint">{view === 'register' ? 'Zvoľte si používateľské meno a heslo. Autentifikátor môžete pridať teraz alebo neskôr v účte.' : view === 'totp' ? 'Otvorte 2FAS, Google Authenticator alebo inú TOTP aplikáciu a zadajte aktuálny šesťmiestny kód.' : view === 'setup' ? 'Naskenujte QR kód v autentifikačnej aplikácii a potvrďte prvý kód.' : view === 'dashboard' ? 'Vyberte si, ako chcete chrániť svoj účet.' : 'Zadajte svoje meno a heslo.'}</p>
 
-        {view === 'loading' ? <p role="status">Overujem prihlásenie…</p> : null}
+        {view === 'loading' ? <p className="loading-status" role="status"><span className="busy-indicator" aria-hidden="true"/>Overujem prihlásenie…</p> : null}
         {view === 'login' || view === 'register' || view === 'totp' ? <form onSubmit={submit}>
           {view !== 'totp' ? <>
             <label htmlFor="username">Používateľské meno</label>
             <input id="username" name="username" autoComplete="username" autoCapitalize="none" spellCheck={false} value={username} onChange={e => setUsername(e.target.value.toLowerCase())} required minLength={3} maxLength={64} pattern="[a-z0-9][a-z0-9._\-]{2,63}" placeholder="napr. student" disabled={busy}/>
-            <label htmlFor="password">Heslo {view === 'register' ? <span className="label-note">· aspoň 12 znakov</span> : null}</label>
-            <input id="password" name="password" type="password" autoComplete={view === 'register' ? 'new-password' : 'current-password'} value={password} onChange={e => setPassword(e.target.value)} required minLength={view === 'register' ? 12 : 1} maxLength={128} disabled={busy}/>
+            <label htmlFor="password">Heslo {view === 'register' ? <span className="label-note">· aspoň 8 znakov</span> : null}</label>
+            <div className="password-field">
+              <input id="password" name="password" type={showPassword ? 'text' : 'password'} autoComplete={view === 'register' ? 'new-password' : 'current-password'} value={password} onChange={e => setPassword(e.target.value)} required minLength={view === 'register' ? 8 : 1} maxLength={128} disabled={busy}/>
+              <button className="password-toggle" type="button" aria-label={showPassword ? 'Skryť heslo' : 'Zobraziť heslo'} aria-pressed={showPassword} onClick={() => setShowPassword(!showPassword)} disabled={busy}>{showPassword ? <EyeOff size={19} strokeWidth={1.5}/> : <Eye size={19} strokeWidth={1.5}/>}</button>
+            </div>
+            {view === 'register' ? <>
+              <label htmlFor="password-confirm">Potvrďte heslo</label>
+              <div className="password-field">
+                <input id="password-confirm" name="password-confirm" type={showPassword ? 'text' : 'password'} autoComplete="new-password" value={passwordConfirm} onChange={e => setPasswordConfirm(e.target.value)} required minLength={8} maxLength={128} disabled={busy}/>
+                <button className="password-toggle" type="button" aria-label={showPassword ? 'Skryť heslo' : 'Zobraziť heslo'} aria-pressed={showPassword} onClick={() => setShowPassword(!showPassword)} disabled={busy}>{showPassword ? <EyeOff size={19} strokeWidth={1.5}/> : <Eye size={19} strokeWidth={1.5}/>}</button>
+              </div>
+            </> : null}
           </> : <>
             <label htmlFor="code">Kód z autentifikátora</label>
             <input className="otp" id="code" name="code" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" minLength={6} maxLength={6} value={code} onChange={e => setCode(e.target.value.replace(/\D/g, ''))} required placeholder="000000" disabled={busy}/>
             {view === 'totp' ? <p className="expiry">Na overenie zostáva {Math.floor(remaining / 60)}:{String(remaining % 60).padStart(2, '0')}.</p> : null}
           </>}
           {error ? <p className="error" role="alert">{error}</p> : null}
-          <button type="submit" disabled={busy}>{busy ? 'Spracúvam…' : view === 'register' ? 'Vytvoriť účet' : view === 'totp' ? 'Overiť a prihlásiť sa' : 'Pokračovať'}<span aria-hidden="true">→</span></button>
-          {view !== 'totp' ? <button className="text-button" type="button" onClick={() => { setView(view === 'login' ? 'register' : 'login'); setError(''); }} disabled={busy}>{view === 'login' ? 'Ešte nemáte účet? Vytvoriť účet' : 'Už máte účet? Prihlásiť sa'}</button> : null}
+          <button type="submit" disabled={busy} aria-busy={busy}>{busy ? 'Spracúvam…' : view === 'register' ? 'Vytvoriť účet' : view === 'totp' ? 'Overiť a prihlásiť sa' : 'Pokračovať'}<span aria-hidden="true">{busy ? <i className="busy-indicator"/> : '→'}</span></button>
+          {view !== 'totp' ? <button className="text-button" type="button" onClick={() => { setView(view === 'login' ? 'register' : 'login'); setPassword(''); setPasswordConfirm(''); setShowPassword(false); setError(''); }} disabled={busy}>{view === 'login' ? <>Ešte nemáte účet? <span className="link-action">Vytvoriť účet</span></> : <>Už máte účet? <span className="link-action">Prihlásiť sa</span></>}</button> : null}
         </form> : null}
 
         {view === 'dashboard' ? <>
@@ -164,13 +233,12 @@ function App() {
           <button className="text-button" type="button" onClick={() => { setView('dashboard'); setEnrollment(null); setCode(''); setError(''); }} disabled={busy}>Neskôr</button>
         </form> : null}
 
-        {view !== 'loading' && view !== 'dashboard' ? <div className="panel-note"><span aria-hidden="true">◇</span><p>{view === 'register' ? 'Heslo musí mať aspoň 12 znakov. Použite také, ktoré nepoužívate inde.' : view === 'setup' ? 'QR kód a tajný kľúč nezdieľajte. Slúžia na tvorbu vašich jednorazových kódov.' : 'Používame HTTPS. Prihlásenie je platné osem hodín.'}</p></div> : null}
-        {view === 'dashboard' ? <div className="panel-note"><span aria-hidden="true">◇</span><p>Relácia vyprší o {Math.floor(remaining / 3600)} h {Math.floor((remaining % 3600) / 60)} min. Údaje TOTP sú šifrované.</p></div> : null}
+        {view !== 'loading' && view !== 'dashboard' ? <div className="panel-note"><p>{view === 'register' ? 'Heslo musí mať aspoň 8 znakov. Použite také, ktoré nepoužívate inde.' : view === 'setup' ? 'QR kód a tajný kľúč nezdieľajte. Slúžia na tvorbu vašich jednorazových kódov.' : 'Používame HTTPS. Prihlásenie je platné osem hodín.'}</p></div> : null}
+        {view === 'dashboard' ? <div className="panel-note"><p>Relácia vyprší o {Math.floor(remaining / 3600)} h {Math.floor((remaining % 3600) / 60)} min. Údaje TOTP sú šifrované.</p></div> : null}
           </section>
         </div>
       </main>
-      <footer className="footer"><span>Bio Token Auth</span></footer>
     </div>
-  </div>;
+  </div></>;
 }
 createRoot(document.getElementById('root')!).render(<App/>);

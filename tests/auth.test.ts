@@ -101,12 +101,12 @@ test('registration creates a session; TOTP can be enrolled now and protects late
 });
 test('registration validates password length and rejects duplicate usernames', async () => {
   const f = await fixture(false, false);
-  assert.equal((await f.request('register', { username: `short-${randomUUID()}`, password: 'too-short' })).status, 400);
-  assert.equal((await f.request('register', { username: f.username, password })).status, 201);
+  assert.equal((await f.request('register', { username: `short-${randomUUID()}`, password: 'short7!' })).status, 400);
+  assert.equal((await f.request('register', { username: f.username, password: 'eight888' })).status, 201);
   await f.request('logout', {});
-  assert.equal((await f.login()).status, 201);
+  assert.equal((await f.request('password', { username: f.username, password: 'eight888' })).status, 201);
   assert.equal((await f.request('me')).status, 200);
-  assert.equal((await f.request('register', { username: f.username, password })).status, 409);
+  assert.equal((await f.request('register', { username: f.username, password: 'eight888' })).status, 409);
 });
 test('wrong passwords and unknown users are rejected without pending cookies', async () => {
   const f = await fixture();

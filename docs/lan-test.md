@@ -49,7 +49,7 @@ Na pridanie aplikácie na plochu otvorte stránku v Safari, stlačte **Zdieľať
 ## 3. Účet a prvé prihlásenie
 
 1. Otvorte HTTPS adresu v prehliadači alebo v Safari na iPhone a zvoľte **Vytvoriť účet**.
-2. Zadajte jedinečné používateľské meno a heslo s dĺžkou aspoň 12 znakov. Po registrácii sa otvorí účet.
+2. Zadajte jedinečné používateľské meno a heslo s dĺžkou 8 až 128 znakov. Heslo zadajte ešte raz na potvrdenie. Po registrácii sa otvorí účet.
 3. TOTP možno zapnúť hneď tlačidlom **Nastaviť TOTP teraz** alebo neskôr po prihlásení.
 4. Pri nastavení naskenujte QR kód v 2FAS, Google Authenticatori alebo kompatibilnej aplikácii a zadajte prvý šesťmiestny kód. Ručný kľúč je dostupný pod odkazom pri QR.
 5. Odhláste sa a skúste sa prihlásiť znova. Keď je TOTP aktívne, server prijme reláciu až po správnom aktuálnom kóde; ten istý 30-sekundový krok nemožno použiť opakovane.

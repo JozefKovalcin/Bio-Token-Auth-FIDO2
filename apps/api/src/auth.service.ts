@@ -15,8 +15,8 @@ export class AuthService {
   constructor(private readonly db: Database) {}
 
   async createUser(username: string, password: string) {
-    if (!/^[a-z0-9][a-z0-9._-]{2,63}$/.test(username) || password.length < 12 || password.length > 128) {
-      throw new Error('Meno: 3–64 znakov a-z/0-9/._-. Heslo: 12–128 znakov.');
+    if (!/^[a-z0-9][a-z0-9._-]{2,63}$/.test(username) || password.length < 8 || password.length > 128) {
+      throw new Error('Meno: 3–64 znakov a-z/0-9/._-. Heslo: 8–128 znakov.');
     }
     const id = randomUUID();
     return this.db.user.create({ data: { id, username,
@@ -25,7 +25,7 @@ export class AuthService {
   }
 
   async register(username: string, password: string, ip: string, oldSession?: string) {
-    if (password.length < 12) throw new BadRequestException('Heslo musí mať aspoň 12 znakov.');
+    if (password.length < 8) throw new BadRequestException('Heslo musí mať aspoň 8 znakov.');
     await this.limit(`register-ip:${ip}`, 10);
     if (await this.db.user.findUnique({ where: { username }, select: { id: true } })) {
       throw new ConflictException('Toto používateľské meno už nie je dostupné.');

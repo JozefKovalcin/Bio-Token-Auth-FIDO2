@@ -2,7 +2,7 @@
 
 ## Režim A
 
-Používateľ si vytvorí účet zadaním jedinečného mena a hesla s dĺžkou najmenej 12 znakov. Po registrácii sa otvorí relácia. TOTP môže zapnúť hneď alebo neskôr v nastaveniach účtu. Aktivácia sa dokončí až po zadaní prvého platného kódu. Server šifruje tajomstvo a obsah QR kódu nezapisuje do logov. Po aktivácii vyžaduje TOTP pri každom novom prihlásení.
+Používateľ si vytvorí účet zadaním jedinečného mena a hesla s dĺžkou 8 až 128 znakov. Formulár vyžaduje aj opätovné zadanie hesla; účet vytvorí iba vtedy, keď sa obe hodnoty zhodujú. Po registrácii sa otvorí relácia. TOTP môže zapnúť hneď alebo neskôr v nastaveniach účtu. Aktivácia sa dokončí až po zadaní prvého platného kódu. Server šifruje tajomstvo a obsah QR kódu nezapisuje do logov. Po aktivácii vyžaduje TOTP pri každom novom prihlásení.
 
 ## Plánované párovanie zariadení
 
