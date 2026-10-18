@@ -12,7 +12,7 @@ Kontajnery definuje `compose.yaml`. Caddy prijíma HTTPS spojenia a podľa cesty
 
 ## Registrácia a aktivácia TOTP
 
-Používateľ si vytvorí účet vo webovom formulári. Meno musí mať 3 až 64 znakov z množiny `a-z`, `0-9`, bodka, podčiarkovník a pomlčka; heslo má 12 až 128 znakov. Server uloží Argon2id hash hesla s náhodnou soľou. Použité parametre sú 64 MiB pamäte, tri priechody a paralelizmus 1. Pri neexistujúcom mene sa vykoná overenie pomocného hashu, takže aj tento prípad spracuje Argon2id. Implementácia tým nezaručuje rovnaký čas každej chybnej odpovede.
+Používateľ si vytvorí účet vo webovom formulári. Meno musí mať 3 až 64 znakov z množiny `a-z`, `0-9`, bodka, podčiarkovník a pomlčka; heslo má 8 až 128 znakov a formulár žiada jeho opätovné zadanie na potvrdenie. Server uloží Argon2id hash hesla s náhodnou soľou. Použité parametre sú 64 MiB pamäte, tri priechody a paralelizmus 1. Pri neexistujúcom mene sa vykoná overenie pomocného hashu, takže aj tento prípad spracuje Argon2id. Implementácia tým nezaručuje rovnaký čas každej chybnej odpovede.
 
 Pri vytvorení účtu vznikne aj náhodné TOTP tajomstvo. Šifrujeme ho pomocou AES-256-GCM so samostatným kľúčom z konfigurácie. Pri každom šifrovaní používame nový 12-bajtový inicializačný vektor a 16-bajtový autentifikačný tag. Identifikátor účtu tvorí autentifikované sprievodné údaje, preto záznam prenesený k inému účtu pri dešifrovaní neprejde kontrolou integrity. Tento postup chráni tajomstvá pri samostatnom úniku databázy; kompromitovaný server s prístupom ku kľúču ich naďalej dokáže dešifrovať.
 

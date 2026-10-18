@@ -1,7 +1,7 @@
 ﻿param([Parameter(Mandatory = $true)][string]$Username)
 $ErrorActionPreference = 'Stop'
 Set-Location (Split-Path $PSScriptRoot -Parent)
-$secure = Read-Host 'Heslo nového účtu (12 až 128 znakov)' -AsSecureString
+$secure = Read-Host 'Heslo nového účtu (8 až 128 znakov)' -AsSecureString
 $ptr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
 $previousEncoding = $OutputEncoding
 try {
