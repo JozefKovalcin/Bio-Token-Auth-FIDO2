@@ -1,5 +1,5 @@
-# Android
+# Android klient
 
-Plán: Kotlin, Jetpack Compose, Coroutines/Flow, AndroidX Biometric, Android Keystore. Obrazovky: párovanie, skenovanie QR, kontrola požiadavky, biometrické schválenie, zoznam zariadení/stav.
+Samostatná Android aplikácia zatiaľ nie je implementovaná. Plánované technológie sú Kotlin, Jetpack Compose, Coroutines/Flow, AndroidX Biometric a Android Keystore. Navrhovaný klient má podporovať párovanie, načítanie QR požiadavky, zobrazenie jej údajov a biometrické schválenie.
 
-UI oddeľte od state holderov. Privátny podpisový kľúč má byť neexportovateľný a autorizovaný pri každom použití pomocou BIOMETRIC_STRONG/CryptoObject. Invalidation pri zmene biometrického enrollmentu musí viesť k opätovnému párovaniu. Hardvérovú ochranu a attestation overujte podľa možností cieľového telefónu; samotný podpis nepreukazuje serveru všetky lokálne nastavenia kľúča.
+Súkromný podpisový kľúč má byť neexportovateľný a jeho použitie má vyžadovať `BIOMETRIC_STRONG` cez `CryptoObject`. Zmena biometrického zápisu môže kľúč zneplatniť a vyžadovať opätovné párovanie. Podpis sám osebe serveru nedokazuje hardvérovú ochranu kľúča; tá vyžaduje overenie atestácie podľa možností telefónu.

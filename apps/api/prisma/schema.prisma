@@ -1,0 +1,41 @@
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "postgresql"
+}
+model User {
+  id             String    @id @default(uuid()) @db.Uuid
+  username       String    @unique
+  passwordHash   String
+  allowedModes   String[]  @default(["A"])
+  totpEncrypted  String
+  totpActive     Boolean   @default(false)
+  lastTotpStep   BigInt    @default(-1)
+  createdAt      DateTime  @default(now()) @db.Timestamptz(3)
+  pending        Pending[]
+  sessions       Session[]
+}
+model Pending {
+  tokenHash String   @id
+  userId    String   @db.Uuid
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime @db.Timestamptz(3)
+  attempts  Int      @default(0)
+  @@index([userId])
+  @@index([expiresAt])
+}
+model Session {
+  tokenHash String   @id
+  userId    String   @db.Uuid
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime @db.Timestamptz(3)
+  @@index([userId])
+  @@index([expiresAt])
+}
+model RateLimit {
+  key       String   @id
+  count     Int
+  expiresAt DateTime @db.Timestamptz(3)
+  @@index([expiresAt])
+}

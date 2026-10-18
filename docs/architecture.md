@@ -1,9 +1,15 @@
 # Architektúra
 
-PC prehliadač komunikuje s NestJS cez HTTPS a s YubiKey prostredníctvom WebAuthn. Android komunikuje s tým istým backendom cez HTTPS; NFC sa nepoužíva. Backend spravuje účty, verejné kľúče, výzvy a session v PostgreSQL.
+V aktuálnej etape webový klient komunikuje cez protokol HTTPS (Hypertext Transfer Protocol Secure) s aplikačným programovacím rozhraním (API, Application Programming Interface) implementovaným v NestJS. API ukladá účty, tajomstvá TOTP (Time-Based One-Time Password) a relácie do PostgreSQL pomocou Prisma ORM. Caddy poskytuje webové súbory a smeruje požiadavky `/api/*` na API. Všetky tri služby bežia v Docker Compose.
 
-WebAuthn discoverable credential režimu C identifikuje účet. PIN YubiKey nenahrádza biometria telefónu. Samotné vloženie kľúča nestačí a aplikácia nedohliada priebežne na USB prítomnosť.
+## Plánované režimy B a C
 
-Biometrické údaje zostávajú na telefóne. Server overuje podpis, nie odtlačok. Model dôvery zahŕňa OS telefónu a autorizáciu Keystore kľúča; pre silnejšie tvrdenia o hardware je potrebná validovaná key attestation a politika registrácie.
+V režime B sa používateľ po zadaní hesla overí kľúčom YubiKey pomocou WebAuthn (Web Authentication). Režim C začína prihlásením kľúčom s objaviteľnými prihlasovacími údajmi (discoverable credential), ktorý server použije na rozpoznanie účtu. Následne web zobrazí QR kód pre krátkodobú požiadavku. Spárovaný telefón načíta údaje o transakcii a podpíše serverovú výzvu pomocou kľúča v Android Keystore.
 
-Voľba: jeden repozitár, samostatné aplikácie. TypeScript workspace pre web/API/kontrakty, samostatný Gradle build Androidu. Supabase hosting sa nevyžaduje; PostgreSQL skill poskytuje odporúčania aj pre vlastnú databázu.
+PIN kľúča YubiKey nenahrádza biometrické potvrdenie v telefóne. Server v režime C musí overiť podpis, väzbu na účet, výzvu, pôvod požiadavky a požadované príznaky prítomnosti a overenia používateľa. Mobilná aplikácia nedostáva webovú reláciu. QR tok sám osebe nedokazuje, že telefón je fyzicky blízko počítača.
+
+Biometrické údaje zostávajú v telefóne. Server overuje podpis vytvorený chráneným kľúčom, nie odtlačok prsta. Silnejšie tvrdenie o ochrane kľúča vyžaduje aj kontrolu jeho atestácie a pravidlá registrácie zariadení.
+
+## Usporiadanie
+
+Web, API, kontrakt OpenAPI a Android aplikácia patria do jedného repozitára. Web a API používajú TypeScript. Android aplikácia má používať samostatný Gradle build. PostgreSQL sa prevádzkuje lokálne v kontajneri; služba Supabase nie je potrebná.

@@ -11,6 +11,10 @@ local.properties
 .env.*
 !.env.example
 *.log
+*.tmp
+*.bak
+*.swp
+*~
 infra/data/
 .DS_Store
 Thumbs.db

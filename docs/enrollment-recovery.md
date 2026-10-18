@@ -1,11 +1,13 @@
-# Registrácia a obnova
+# Registrácia a obnova účtu
 
-Bootstrap účtu je samostatný proces. Pre prototyp použite kontrolovanú administrátorskú registráciu; verejný onboarding ešte nie je navrhnutý.
+## Režim A
 
-YubiKey sa registruje do autentifikovanej enrollment relácie. Pre C vyžadujte residentKey=required a userVerification=required. Pre B registrujte samostatný non-discoverable credential.
+Používateľ si vytvorí účet zadaním jedinečného mena a hesla s dĺžkou najmenej 12 znakov. Po registrácii sa otvorí relácia. TOTP môže zapnúť hneď alebo neskôr v nastaveniach účtu. Aktivácia sa dokončí až po zadaní prvého platného kódu. Server šifruje tajomstvo a obsah QR kódu nezapisuje do logov. Po aktivácii vyžaduje TOTP pri každom novom prihlásení.
 
-Telefón sa páruje krátkodobou požiadavkou po silnom overení účtu. Server viaže verejný mobilný kľúč na účet; pripojenie zariadenia vyžaduje potvrdenie pôvodného procesu. Zmena biometrie môže zneplatniť kľúč a vyžaduje nové párovanie.
+## Plánované párovanie zariadení
 
-TOTP sa aktivuje až po potvrdení prvého kódu. Tajomstvo sa šifruje; QR sa nezapisuje do logov.
+Režim B má registrovať kľúč YubiKey v overenej relácii. Režim C vyžaduje objaviteľné prihlasovacie údaje a príznak overenia používateľa. Telefón sa páruje krátkodobou požiadavkou po silnom overení účtu. Server uloží verejný mobilný kľúč vo väzbe na účet. Zmena biometrického zápisu môže zneplatniť súkromný kľúč a vyžadovať nové párovanie.
 
-Strata zariadenia: odvolať credential/zariadenie a existujúce relácie, auditovať udalosť. Uprednostnite záložný zaregistrovaný kľúč a kontrolovaný proces obnovy. Automatický email-only fallback do režimu C nie je povolený. Presná obnova je otvorené rozhodnutie pred produkčným nasadením.
+## Obnova
+
+Obnova TOTP účtu a výmena alebo vypnutie aktívneho faktora zatiaľ nie sú implementované. Návrh pre režimy B/C počíta s odvolaním strateného kľúča alebo zariadenia a dotknutých relácií. Pred nasadením treba určiť kontrolovaný proces obnovy a auditovať jeho použitie. Automatické obnovenie režimu C iba cez e-mail nie je povolené.

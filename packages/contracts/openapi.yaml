@@ -1,0 +1,209 @@
+openapi: 3.1.0
+info:
+  title: Bio Token Auth — Mode A
+  version: 0.1.0
+  description: Same-origin HTTPS API. All POST requests require the exact configured Origin and application/json. All API responses are no-store. B/C are not implemented.
+servers:
+  - url: /
+components:
+  securitySchemes:
+    pending:
+      type: apiKey
+      in: cookie
+      name: __Host-bio_pending
+    session:
+      type: apiKey
+      in: cookie
+      name: __Host-bio_session
+  schemas:
+    Error:
+      type: object
+      properties:
+        message: {type: string}
+        statusCode: {type: integer}
+    UserSession:
+      type: object
+      required: [username, mode, totpActive, expiresAt]
+      properties:
+        username: {type: string}
+        mode: {type: string, const: A}
+        totpActive: {type: boolean}
+        expiresAt: {type: string, format: date-time}
+  responses:
+    BadRequest:
+      description: Invalid request body
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+    Unauthorized:
+      description: Invalid credentials, disallowed mode, missing/expired/consumed transaction, replay or missing/expired session
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+    Forbidden:
+      description: Missing/wrong Origin or unsupported Content-Type
+    Limited:
+      description: Five-minute attempt limit reached
+paths:
+  /api/health:
+    get:
+      operationId: health
+      responses:
+        '200':
+          description: API started and database connected at startup
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: {type: string, const: ok}
+                  modes: {type: array, items: {type: string, const: A}}
+  /api/auth/register:
+    post:
+      operationId: register
+      description: Creates a unique account with a minimum 12-character password, issues a Secure/HttpOnly/SameSite=Strict eight-hour session, and leaves TOTP optional until activated from that session.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username: {type: string, pattern: '^[a-z0-9][a-z0-9._-]{2,63}$', maxLength: 64}
+                password: {type: string, minLength: 12, maxLength: 128}
+      responses:
+        '201':
+          description: Account created and signed in
+          headers:
+            Set-Cookie: {schema: {type: string}, description: __Host-bio_session; Secure; HttpOnly; SameSite=Strict; Path=/; Expires=...}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/UserSession'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {description: Username is unavailable}
+        '429': {$ref: '#/components/responses/Limited'}
+  /api/auth/password:
+    post:
+      operationId: verifyPassword
+      description: Verifies password and backend policy. If TOTP is active, issues a five-minute pending cookie; otherwise, issues an eight-hour session. Replaces the calling browser's old pending transaction.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username: {type: string, pattern: '^[a-z0-9][a-z0-9._-]{2,63}$', maxLength: 64}
+                password: {type: string, minLength: 1, maxLength: 128}
+      responses:
+        '201':
+          description: Pending authentication created
+          headers:
+            Set-Cookie: {schema: {type: string}, description: __Host-bio_pending; Secure; HttpOnly; SameSite=Strict; Path=/; Expires=...}
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [step, expiresAt]
+                properties:
+                  step: {type: string, enum: [done, totp]}
+                  expiresAt: {type: string, format: date-time}
+                  user: {$ref: '#/components/schemas/UserSession'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '429': {$ref: '#/components/responses/Limited'}
+  /api/auth/enrollment:
+    get:
+      operationId: getTotpSetup
+      security: [{session: []}]
+      description: Returns setup material only to a signed-in account that has not enabled TOTP. Secret and QR must never be cached, logged, or sent to an external QR service.
+      responses:
+        '200':
+          description: Initial enrollment material
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [secret, qr]
+                properties:
+                  secret: {type: string, description: Base32 TOTP secret}
+                  qr: {type: string, description: Locally generated PNG data URL}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '409': {description: TOTP is already active}
+  /api/auth/totp/activate:
+    post:
+      operationId: activateTotp
+      security: [{session: []}]
+      description: Verifies the first six-digit TOTP code and activates the factor. The account row is locked to prevent replay during simultaneous setup requests.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code: {type: string, pattern: '^[0-9]{6}$'}
+      responses:
+        '201': {description: TOTP is active}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {description: TOTP is already active}
+        '429': {$ref: '#/components/responses/Limited'}
+  /api/auth/totp:
+    post:
+      operationId: completeModeA
+      security: [{pending: []}]
+      description: SHA-1 / six digits / 30 seconds / ±30-second tolerance. At most five attempts per pending transaction and ten per account per five minutes. Atomically consumes pending, advances account timestep and creates an eight-hour session. TOTP must already be active.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code: {type: string, pattern: '^[0-9]{6}$'}
+      responses:
+        '201':
+          description: Authenticated; pending cookie cleared and session cookie issued
+          headers:
+            Set-Cookie: {schema: {type: string}, description: __Host-bio_session; Secure; HttpOnly; SameSite=Strict; Path=/; Expires=...}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/UserSession'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '429': {$ref: '#/components/responses/Limited'}
+  /api/auth/me:
+    get:
+      operationId: currentSession
+      security: [{session: []}]
+      responses:
+        '200':
+          description: Active session whose account still allows A
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/UserSession'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+  /api/auth/logout:
+    post:
+      operationId: logout
+      description: Idempotently revoke supplied pending and session cookies in the database and clear both cookies. Origin and JSON remain required even without cookies.
+      requestBody:
+        content:
+          application/json:
+            schema: {type: object}
+      responses:
+        '201':
+          description: Logged out
+          content:
+            application/json:
+              schema: {type: object, properties: {ok: {type: boolean, const: true}}}
+        '403': {$ref: '#/components/responses/Forbidden'}

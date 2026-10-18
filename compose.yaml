@@ -1,0 +1,55 @@
+name: bio-token-auth
+services:
+  db:
+    image: postgres:18.4
+    environment:
+      POSTGRES_USER: bio_auth
+      POSTGRES_DB: bio_auth
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run scripts/Init-Lan.ps1 first}
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U bio_auth -d bio_auth']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+  api:
+    build:
+      context: .
+      target: api
+    environment:
+      DATABASE_URL: postgresql://bio_auth:${POSTGRES_PASSWORD}@db:5432/bio_auth
+      APP_ORIGIN: https://${APP_HOST:?Run scripts/Init-Lan.ps1 first}
+      TOTP_ENCRYPTION_KEY: ${TOTP_ENCRYPTION_KEY:?Run scripts/Init-Lan.ps1 first}
+    command: [sh, -c, 'pnpm db:deploy && node dist/api/main.js']
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      start_period: 30s
+      retries: 12
+    restart: unless-stopped
+  caddy:
+    build:
+      context: .
+      target: web
+    environment:
+      APP_HOST: ${APP_HOST}
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+volumes:
+  postgres_data:
+  caddy_data:
+  caddy_config:

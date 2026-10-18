@@ -1,21 +1,23 @@
 # Prihlasovací tok
 
+V súčasnosti je implementovaný režim A. Režimy B a C v tejto kapitole opisujú cieľové správanie, nie dostupné funkcie aplikácie.
+
 ## A: heslo a TOTP
 
-Overenie mena/hesla → pending transakcia → TOTP → session. Obmedzte pokusy a časové okno; rovnaký TOTP timestep nesmie byť znovu prijatý pre účet.
+Registrácia vytvorí účet a prihlásenú reláciu. Používateľ môže aktivovať časovo odvodené jednorazové heslo TOTP (Time-Based One-Time Password) pri registrácii alebo neskôr v účte. Kým faktor nie je aktívny, nové prihlásenie dokončí heslo. Po aktivácii server po správnom hesle vytvorí rozpracované overenie s päťminútovou platnosťou. Používateľ ho dokončí aktuálnym kódom TOTP. Server obmedzuje počet pokusov a odmieta opätovné použitie toho istého časového kroku.
 
 ## B: heslo a YubiKey
 
-Overenie mena/hesla → výzva pre zaregistrované non-discoverable credentials → WebAuthn verification → session. Pri registrácii nevyžadujte resident key. Ak je striktne vyžadovaný YubiKey, nastavte politiku trusted attestation; USB hint sám nepreukazuje model kľúča.
+Navrhovaný tok overí používateľské meno a heslo, potom vyžiada podpis WebAuthn od zaregistrovaného kľúča YubiKey. Prihlasovacie údaje pre režim B nemajú byť objaviteľné. Ak nasadenie vyžaduje konkrétny model kľúča, samotný USB hint nestačí; server musí uplatniť príslušnú politiku atestácie.
 
 ## C: YubiKey a Android
 
-1. Prehliadač vytvorí pending reláciu a požiada o WebAuthn bez vopred zadaného účtu.
-2. YubiKey odpovie discoverable credential; server overí podpis, UP/UV, challenge, RP ID, origin a identitu účtu.
-3. Server vytvorí mobilnú výzvu s predvolenou platnosťou 120 sekúnd. QR obsahuje jednorazový náhodný opaque identifikátor, nie session cookie.
-4. Mobil načíta transakciu, zobrazí službu/účet a vyžiada explicitné schválenie.
-5. BIOMETRIC_STRONG cez CryptoObject autorizuje podpis kanonickej serverovej výzvy. Podpis je viazaný na účel, transakciu, účet, expiráciu a nonce.
-6. Backend overí verejný kľúč spárovaného aktívneho zariadenia toho istého účtu a jednorazovo schváli transakciu.
-7. Pôvodný prehliadač transakciu atomicky spotrebuje a dostane novú session cookie; pending session sa zruší.
+1. Prehliadač vytvorí rozpracované prihlásenie a vyžiada WebAuthn bez používateľského mena.
+2. Kľúč YubiKey použije objaviteľné prihlasovacie údaje. Server overí podpis, výzvu, RP ID, origin, identitu účtu a požadované príznaky prítomnosti a overenia používateľa.
+3. Server vytvorí mobilnú výzvu s predvolenou platnosťou 120 sekúnd. QR kód obsahuje jednorazový náhodný identifikátor, nie session cookie.
+4. Spárovaný telefón načíta transakciu, zobrazí službu a účet a vyžiada výslovné schválenie.
+5. Biometricky autorizovaný kľúč v Android Keystore podpíše kanonickú serverovú výzvu. Podpis sa viaže na účel, transakciu, účet, expiráciu a jednorazovú hodnotu.
+6. Backend overí podpis verejným kľúčom aktívneho zariadenia toho istého účtu a transakciu jednorazovo schváli.
+7. Pôvodný prehliadač atomicky dokončí transakciu a dostane novú session cookie. Rozpracovaná relácia sa zruší.
 
-Stavy: PENDING_YUBIKEY → PENDING_MOBILE → APPROVED → CONSUMED. Koncové alternatívy: EXPIRED, REJECTED, CANCELLED. Stavové endpointy sú dostupné iba držiteľovi príslušnej pending relácie; QR sa neloguje.
+Stavy transakcie sú `PENDING_YUBIKEY`, `PENDING_MOBILE`, `APPROVED` a `CONSUMED`. Koncové stavy sú `EXPIRED`, `REJECTED` a `CANCELLED`. Stavové endpointy môže použiť iba držiteľ príslušnej rozpracovanej relácie a QR obsah sa nesmie zapisovať do logov.

@@ -1,0 +1,26 @@
+name: bio-token-auth-test
+services:
+  test-db:
+    image: postgres:18.4
+    environment:
+      POSTGRES_USER: bio_test
+      POSTGRES_PASSWORD: disposable-test-password
+      POSTGRES_DB: bio_test
+    tmpfs:
+      - /var/lib/postgresql
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U bio_test -d bio_test']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+  tests:
+    build:
+      context: .
+      target: api
+    environment:
+      DATABASE_URL: postgresql://bio_test:disposable-test-password@test-db:5432/bio_test
+      TEST_DATABASE_URL: postgresql://bio_test:disposable-test-password@test-db:5432/bio_test
+    command: [sh, -c, 'pnpm db:deploy && pnpm check && pnpm test']
+    depends_on:
+      test-db:
+        condition: service_healthy

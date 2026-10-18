@@ -1,0 +1,6 @@
+allowBuilds:
+  '@prisma/engines': true
+  '@nestjs/core': true
+  argon2: true
+  esbuild: true
+  prisma: true

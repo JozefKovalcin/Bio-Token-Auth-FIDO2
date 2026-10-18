@@ -1,8 +1,8 @@
-# Projektové skilly
+# Projektové vývojové pokyny
 
-Web/API skilly: vercel-react-best-practices, nestjs-best-practices, prisma-orm-setup, supabase-postgres-best-practices.
+Pre web a API sú v repozitári dostupné pokyny `vercel-react-best-practices`, `nestjs-best-practices`, `prisma-orm-setup` a `supabase-postgres-best-practices`.
 
-Android skilly z ashtanko/compose-android-template:
+Android pokyny pochádzajú z repozitára `ashtanko/compose-android-template`:
 
 - compose-state-holder-ui-split: oddelenie UI a state holdera.
 - kotlin-flow-state-event-modeling: Flow, stav a udalosti.
@@ -12,20 +12,20 @@ Android skilly z ashtanko/compose-android-template:
 
 ## Aktualizácia
 
-Zdroj overený 2026-10-11 na commite `510e52b62464e8663c33706ea35eb81b432bd33e`. Pôvodné dva skilly existujú aj tu a oproti historickému commitu `a69c8db62c0d27ad42fe57f57396aab06e13eb84` sa obsahovo nezmenili. Pôvodná informácia o odstránení bola nepresná: skills CLI ich neuvádza medzi objavenými skillmi.
+Zdroj Android pokynov sme overili 2026-10-11 na commite `510e52b62464e8663c33706ea35eb81b432bd33e`. Dva existujúce pokyny sme porovnali s commitom `a69c8db62c0d27ad42fe57f57396aab06e13eb84`; ich obsah sa nezmenil.
 
-Tri workflow skilly boli nainštalované projektovo pre Codex:
+Tri workflow pokyny sú nainštalované projektovo pre Codex:
 
 ```powershell
 npx --yes skills add ashtanko/compose-android-template --skill add-android-module deliver-android-feature verify-android-change --agent codex --yes
 ```
 
-Sedem CLI inštalácií eviduje `skills-lock.json`. Dva manuálne inštalované skilly a aktuálny zdroj všetkých piatich Android skillov eviduje `android-skills-provenance.json`. Všetkých deväť skillov je v `.agents/skills/`.
+Sedem inštalácií cez CLI eviduje `skills-lock.json`. `android-skills-provenance.json` zaznamenáva dva manuálne pridané pokyny a pôvod všetkých piatich Android pokynov. Všetkých deväť adresárov je v `.agents/skills/`.
 
 ## Použitie
 
-Pred Android prácou načítajte `.agents/README.md` a relevantné `.agents/reference/` dokumenty. Nové skilly predpokladajú plný upstream Android template. Tento projekt zatiaľ nemá generátor modulov, Gradle wrapper, convention plugins ani Makefile. Nespúšťajte neexistujúce príkazy a nepreberajte template balíky ako fakty projektu.
+Pred Android prácou načítajte `.agents/README.md` a relevantné dokumenty v `.agents/reference/`. Android pokyny predpokladajú úplnú šablónu upstream projektu. Tento repozitár zatiaľ nemá generátor modulov, Gradle wrapper, convention plugins ani Makefile. Používajte iba príkazy a nástroje, ktoré v projekte skutočne existujú.
 
-Referencie sú projektové, nie kópie upstream template. Ďalšie focused skilly spomínané v pokynoch nie sú automaticky nainštalované; pri potrebe načítajte zdroj z evidovaného commitu.
+Referencie opisujú tento projekt a nie sú kópiami upstream šablóny. Ďalšie zamerané pokyny uvedené v Android materiáloch nie sú automaticky nainštalované. Ak ich implementácia vyžaduje, načítajte zdroj z evidovaného commitu.
 
-React/Prisma implementácia je ďalšia etapa. Pri Prisma setup overte publikovanú podporovanú verziu a načítajte jej pokyny; inštalácia skillu nie je ORM setup.
+Pri zmene konfigurácie Prisma overte kompatibilitu používanej verzie s databázou a načítajte súvisiace pokyny. Inštalácia vývojového pokynu sama osebe nemení konfiguráciu ORM.

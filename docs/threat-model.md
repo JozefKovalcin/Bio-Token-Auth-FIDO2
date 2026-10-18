@@ -1,17 +1,17 @@
 # Model hrozieb
 
-Chránené aktíva: účet, pending/web session, TOTP tajomstvo, verejné väzby zariadení a ich integrita.
+Model pokrýva implementovaný režim A a návrh režimov B/C. Tabuľka uvádza, ktoré kontroly sú súčasťou aplikácie a ktoré treba doplniť pred implementáciou ďalších režimov.
 
-| Hrozba | Kontrola |
-| --- | --- |
-| Replay | Jednorazový nonce, expirácia, atomická spotreba |
-| Zámena účtu alebo QR | Väzba transakcie na účet, pôvodnú reláciu a mobilný verejný kľúč |
-| Obídenie silnejšieho režimu | Serverová politika a stavový automat |
-| QR phishing/relay | Kontrola služby a požiadavky na mobile; neprehlasovať vlastný QR tok za dôkaz fyzickej blízkosti |
-| Session fixation / CSRF | Rotácia session po úspechu, Secure/HttpOnly/SameSite, CSRF/origin kontroly |
-| Brute force | Limity pokusov a audit pre heslá, TOTP a pending požiadavky |
-| Podvrhnutý biometrický callback | Biometricky autorizovaný podpis; validácia enrollmentu a podľa politiky attestation |
-| Únik databázy | Argon2id, šifrovanie TOTP oddeleným kľúčom, minimum uložených dát |
-| Krádež zariadenia | PIN kľúča, biometria telefónu, odvolanie zariadení a session |
+| Hrozba | Kontrola | Stav |
+| --- | --- | --- |
+| Opakované použitie TOTP | Server prijme časový krok iba raz a dokončenie vykoná atomicky. | Režim A |
+| Zámena účtu alebo QR požiadavky | Transakcia sa viaže na účet, pôvodnú reláciu a mobilný verejný kľúč. | Plánované pre C |
+| Obídenie povinného režimu | Dostupné režimy určuje serverová politika účtu. | Pravidlo je zdokumentované; B/C nie sú implementované |
+| QR phishing alebo relay útok | Telefón zobrazí službu a účet; QR tok nedokazuje fyzickú blízkosť. | Plánované pre C |
+| Fixácia relácie alebo falšovanie požiadaviek medzi webmi (CSRF, Cross-Site Request Forgery) | Po úspešnom prihlásení sa mení identifikátor relácie; cookies používajú Secure, HttpOnly a SameSite=Strict a API kontroluje `Origin`. | Režim A |
+| Hádanie hesiel alebo kódov | Limity požiadaviek na účet a adresu internetového protokolu (IP, Internet Protocol) obmedzujú počet pokusov. | Režim A |
+| Podvrhnutý výsledok biometrie | Server overí podpis vytvorený kľúčom autorizovaným systémovou biometriou. | Plánované pre C |
+| Únik databázy | Heslá sa hashujú pomocou Argon2id a TOTP tajomstvá sa šifrujú oddeleným kľúčom. | Režim A |
+| Strata kľúča alebo telefónu | Zariadenie a jeho relácie možno odvolať; obnova vyžaduje kontrolovaný proces. | Plánované; obnova nie je implementovaná |
 
-Vlastný QR tok na internete nemá Bluetooth kontrolu blízkosti ako WebAuthn hybrid. YubiKey krok má phishing-resistant vlastnosti WebAuthn, no celý vlastný schvaľovací tok treba posudzovať samostatne. Rootovaný/kompromitovaný telefón a PC sú významné limity modelu dôvery.
+QR tok pre režim C nemá mechanizmus blízkosti porovnateľný s WebAuthn hybridným tokom. Kľúč YubiKey môže poskytnúť ochranu WebAuthn proti phishingu, no schvaľovanie cez QR sa musí posudzovať samostatne. Kompromitovaný operačný systém telefónu alebo počítača zostáva mimo ochrany tejto aplikácie.
