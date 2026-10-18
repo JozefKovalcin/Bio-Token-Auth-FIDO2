@@ -61,7 +61,7 @@ paths:
   /api/auth/register:
     post:
       operationId: register
-      description: Creates a unique account with a minimum 12-character password, issues a Secure/HttpOnly/SameSite=Strict eight-hour session, and leaves TOTP optional until activated from that session.
+      description: Creates a unique account with an 8–128-character password, issues a Secure/HttpOnly/SameSite=Strict eight-hour session, and leaves TOTP optional until activated from that session.
       requestBody:
         required: true
         content:
@@ -71,7 +71,7 @@ paths:
               required: [username, password]
               properties:
                 username: {type: string, pattern: '^[a-z0-9][a-z0-9._-]{2,63}$', maxLength: 64}
-                password: {type: string, minLength: 12, maxLength: 128}
+                password: {type: string, minLength: 8, maxLength: 128}
       responses:
         '201':
           description: Account created and signed in
