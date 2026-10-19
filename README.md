@@ -65,6 +65,7 @@ Adresu v príkaze nahraďte hodnotou `APP_HOST` z `.env`. Podrobné očakávané
 
 ## Dokumentácia
 
+- [Pokračovanie na druhom zariadení a úvodný prompt](docs/handoff-next-device.md)
 - [Režim A](docs/mode-a.md)
 - [Režimy B/C, konfigurácia a akceptácia](docs/modes-b-c.md)
 - [Android build a inštalácia](apps/android/README.md)
