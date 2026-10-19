@@ -13,8 +13,15 @@ model User {
   totpActive     Boolean   @default(false)
   lastTotpStep   BigInt    @default(-1)
   createdAt      DateTime  @default(now()) @db.Timestamptz(3)
+  securityVersion Int @default(1)
+  disabled Boolean @default(false)
   pending        Pending[]
   sessions       Session[]
+  credentials WebAuthnCredential[]
+  transactions AuthTransaction[]
+  devices MobileDevice[]
+  pairings PairingRequest[]
+  grants ReauthGrant[]
 }
 model Pending {
   tokenHash String   @id
@@ -22,6 +29,9 @@ model Pending {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   expiresAt DateTime @db.Timestamptz(3)
   attempts  Int      @default(0)
+  securityVersion Int @default(1)
+  passwordVerifiedAt DateTime @default(now()) @db.Timestamptz(3)
+  oldSessionHash String?
   @@index([userId])
   @@index([expiresAt])
 }
@@ -30,6 +40,13 @@ model Session {
   userId    String   @db.Uuid
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   expiresAt DateTime @db.Timestamptz(3)
+  mode String @default("A")
+  factors String[] @default([])
+  authTime DateTime @default(now()) @db.Timestamptz(3)
+  securityVersion Int @default(0)
+  credentialId String? @db.Uuid
+  deviceId String? @db.Uuid
+  sourceTransactionId String? @unique @db.Uuid
   @@index([userId])
   @@index([expiresAt])
 }
@@ -38,4 +55,132 @@ model RateLimit {
   count     Int
   expiresAt DateTime @db.Timestamptz(3)
   @@index([expiresAt])
+}
+
+model WebAuthnCredential {
+  id String @id @default(uuid()) @db.Uuid
+  credentialId String @unique
+  userId String @db.Uuid
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userHandle String @unique
+  profile String
+  publicKey Bytes
+  counter BigInt @default(0)
+  version Int @default(1)
+  state String @default("CANDIDATE")
+  rpId String
+  aaguid String
+  transports String[]
+  backedUp Boolean @default(false)
+  deviceType String
+  attestationVerified Boolean @default(false)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  proofAt DateTime? @db.Timestamptz(3)
+  revokedAt DateTime? @db.Timestamptz(3)
+  @@index([userId, profile, state])
+}
+
+model AuthTransaction {
+  id String @id @default(uuid()) @db.Uuid
+  tokenHash String @unique
+  userId String? @db.Uuid
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mode String
+  purpose String
+  state String
+  challenge String?
+  userHandle String?
+  credentialId String? @db.Uuid
+  deviceId String? @db.Uuid
+  securityVersion Int?
+  expiresAt DateTime @db.Timestamptz(3)
+  attempts Int @default(0)
+  version Int @default(1)
+  passwordVerifiedAt DateTime? @db.Timestamptz(3)
+  webauthnVerifiedAt DateTime? @db.Timestamptz(3)
+  mobileVerifiedAt DateTime? @db.Timestamptz(3)
+  mobileChallenge String?
+  mobileTokenHash String? @unique
+  sourceSessionHash String?
+  oldSessionHash String?
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  challenges MobileChallenge[]
+  @@index([userId, state])
+  @@index([expiresAt])
+}
+
+model ReauthGrant {
+  tokenHash String @id
+  userId String @db.Uuid
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sessionHash String
+  scope String
+  securityVersion Int
+  expiresAt DateTime @db.Timestamptz(3)
+  consumedAt DateTime? @db.Timestamptz(3)
+  @@index([expiresAt])
+}
+
+model MobileDevice {
+  id String @id @default(uuid()) @db.Uuid
+  userId String @db.Uuid
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  approvalPublicJwk Json
+  authPublicJwk Json
+  status String @default("CANDIDATE")
+  trustLevel String
+  trustEvidence Json?
+  label String @default("Android")
+  version Int @default(1)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  revokedAt DateTime? @db.Timestamptz(3)
+  challenges MobileChallenge[]
+  @@index([userId, status])
+}
+
+model PairingRequest {
+  id String @id @default(uuid()) @db.Uuid
+  userId String @db.Uuid
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  browserSessionHash String
+  tokenHash String @unique
+  expiresAt DateTime @db.Timestamptz(3)
+  status String @default("PENDING")
+  pendingDeviceId String? @db.Uuid
+  challenge String
+  purpose String @default("PAIRING")
+  securityVersion Int
+  confirmationCode String?
+  challenges MobileChallenge[]
+  @@index([userId, status])
+  @@index([expiresAt])
+}
+
+model MobileChallenge {
+  id String @id @default(uuid()) @db.Uuid
+  deviceId String? @db.Uuid
+  device MobileDevice? @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  pairingId String? @db.Uuid
+  pairing PairingRequest? @relation(fields: [pairingId], references: [id], onDelete: Cascade)
+  transactionId String? @db.Uuid
+  transaction AuthTransaction? @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  purpose String
+  signingInput String
+  expiresAt DateTime @db.Timestamptz(3)
+  consumedAt DateTime? @db.Timestamptz(3)
+  requestHash String?
+  @@index([expiresAt])
+  @@index([deviceId])
+  @@index([transactionId])
+  @@index([pairingId])
+}
+
+model AuditEvent {
+  id String @id @default(uuid()) @db.Uuid
+  userId String? @db.Uuid
+  event String
+  details Json?
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@index([userId, createdAt])
+  @@index([createdAt])
 }

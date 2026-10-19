@@ -24,7 +24,7 @@ Sedem inštalácií cez CLI eviduje `skills-lock.json`. `android-skills-provenan
 
 ## Použitie
 
-Pred Android prácou načítajte `.agents/README.md` a relevantné dokumenty v `.agents/reference/`. Android pokyny predpokladajú úplnú šablónu upstream projektu. Tento repozitár zatiaľ nemá generátor modulov, Gradle wrapper, convention plugins ani Makefile. Používajte iba príkazy a nástroje, ktoré v projekte skutočne existujú.
+Pred Android prácou načítajte `.agents/README.md` a relevantné dokumenty v `.agents/reference/`. Android pokyny predpokladajú úplnú šablónu upstream projektu. Tento repozitár má vlastný samostatný Gradle wrapper v apps/android, moduly :app/:core a tasky uvedené v Android README a .agents/reference/commands.md. Upstream generátor modulov, convention plugins ani Makefile tu nie sú. Používajte iba reálne existujúce tasky.
 
 Referencie opisujú tento projekt a nie sú kópiami upstream šablóny. Ďalšie zamerané pokyny uvedené v Android materiáloch nie sú automaticky nainštalované. Ak ich implementácia vyžaduje, načítajte zdroj z evidovaného commitu.
 

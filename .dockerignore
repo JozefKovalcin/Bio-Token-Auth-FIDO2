@@ -9,3 +9,8 @@ infra/data
 outputs
 work
 *.log
+.codex-tmp
+apps/android
+infra/attestation
+test-results
+playwright-report

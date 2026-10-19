@@ -26,6 +26,18 @@ if (-not (Test-Path -LiteralPath '.env')) {
     $existingHost = ((Get-Content -LiteralPath '.env' | Where-Object { $_ -match '^APP_HOST=' }) -replace '^APP_HOST=', '').Trim()
     if ($existingHost -ne $AppHost.ToLowerInvariant()) { throw 'APP_HOST sa líši od existujúcej konfigurácie. Upravte ho v .env; šifrovacie kľúče zachovajte.' }
 }
-docker compose up --build -d --wait
+$runtimeFlags = @{}
+Get-Content -LiteralPath '.env' | ForEach-Object {
+    if ($_ -match '^(WEBAUTHN_ENABLED|MODE_C_ENABLED|APP_HOST)=(.*)$') { $runtimeFlags[$Matches[1]] = $Matches[2].Trim() }
+}
+if ($runtimeFlags['WEBAUTHN_ENABLED'] -eq 'true') {
+    $parsedIp = $null
+    if ([Net.IPAddress]::TryParse($runtimeFlags['APP_HOST'], [ref]$parsedIp)) {
+        throw 'WebAuthn vyžaduje stabilné DNS meno v APP_HOST a WEBAUTHN_RP_ID. Zachovajte existujúce tajomstvá a postupujte podľa docs/modes-b-c.md.'
+    }
+}
+$composeProfile = @()
+if ($runtimeFlags['MODE_C_ENABLED'] -eq 'true') { $composeProfile = @('--profile', 'mode-c') }
+docker compose @composeProfile up --build -d --wait
 if ($LASTEXITCODE -ne 0) { throw 'Spustenie zlyhalo. Podrobnosti: docker compose logs --tail 50' }
 Write-Host 'Kontajnery sú pripravené. Pred prvým prihlásením nastavte dôveru HTTPS podľa docs/lan-test.md.'

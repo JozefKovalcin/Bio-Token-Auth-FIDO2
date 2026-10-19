@@ -1,8 +1,12 @@
 openapi: 3.1.0
 info:
-  title: Bio Token Auth — Mode A
-  version: 0.1.0
-  description: Same-origin HTTPS API. All POST requests require the exact configured Origin and application/json. All API responses are no-store. B/C are not implemented.
+  title: Bio Token Auth — Modes A/B/C
+  version: 0.2.0
+  description: >-
+    Same-origin HTTPS browser API and separate native proof API. Browser mutations require the exact configured Origin, JSON and the indicated cookie. Native
+    /api/mobile operations accept no browser cookies and authenticate using purpose-bound, one-use cryptographic device proofs. All API responses are no-store.
+    B requires configured trusted YubiKey attestation; C additionally requires an explicit physical hardware release gate and trusted Android key attestation.
+    Disabled modes return 503. Never log passwords, OTP, cookies, QR capabilities, signing inputs, private keys or biometric data.
 servers:
   - url: /
 components:
@@ -19,31 +23,481 @@ components:
     Error:
       type: object
       properties:
-        message: {type: string}
-        statusCode: {type: integer}
+        message:
+          type: string
+        statusCode:
+          type: integer
     UserSession:
       type: object
-      required: [username, mode, totpActive, expiresAt]
+      required:
+        - username
+        - mode
+        - totpActive
+        - expiresAt
       properties:
-        username: {type: string}
-        mode: {type: string, const: A}
-        totpActive: {type: boolean}
-        expiresAt: {type: string, format: date-time}
+        username:
+          type: string
+        mode:
+          type: string
+          enum:
+            - A
+            - B
+            - C
+        totpActive:
+          type: boolean
+        expiresAt:
+          type: string
+          format: date-time
+        authTime:
+          type: string
+          format: date-time
+        factors:
+          type: array
+          items:
+            type: string
+            enum:
+              - password
+              - totp
+              - webauthn
+              - mobile
+        allowedModes:
+          type: array
+          items:
+            type: string
+            enum:
+              - A
+              - B
+              - C
+    Opaque:
+      type: string
+      pattern: ^[A-Za-z0-9_-]{43}$
+      description: Secret random capability. Never log or persist outside protected application state.
+    WebAuthnRegistration:
+      type: object
+      required:
+        - id
+        - rawId
+        - type
+        - response
+        - clientExtensionResults
+      properties:
+        id:
+          type: string
+          maxLength: 2048
+        rawId:
+          type: string
+          maxLength: 2048
+        type:
+          type: string
+          const: public-key
+        response:
+          type: object
+          required:
+            - clientDataJSON
+            - attestationObject
+          properties:
+            clientDataJSON:
+              type: string
+              maxLength: 49152
+            attestationObject:
+              type: string
+              maxLength: 49152
+            transports:
+              type: array
+              items:
+                type: string
+        clientExtensionResults:
+          type: object
+        authenticatorAttachment:
+          type: string
+    WebAuthnAssertion:
+      type: object
+      required:
+        - id
+        - rawId
+        - type
+        - response
+        - clientExtensionResults
+      properties:
+        id:
+          type: string
+          maxLength: 2048
+        rawId:
+          type: string
+          maxLength: 2048
+        type:
+          type: string
+          const: public-key
+        response:
+          type: object
+          required:
+            - clientDataJSON
+            - authenticatorData
+            - signature
+          properties:
+            clientDataJSON:
+              type: string
+              maxLength: 4096
+            authenticatorData:
+              type: string
+              maxLength: 4096
+            signature:
+              type: string
+              maxLength: 4096
+            userHandle:
+              type:
+                - string
+                - 'null'
+              maxLength: 128
+        clientExtensionResults:
+          type: object
+        authenticatorAttachment:
+          type: string
+    CredentialDescriptor:
+      type: object
+      required:
+        - id
+        - type
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          const: public-key
+        transports:
+          type: array
+          items:
+            type: string
+    AuthenticationOptions:
+      type: object
+      required:
+        - challenge
+        - rpId
+        - userVerification
+        - timeout
+      properties:
+        challenge:
+          type: string
+        rpId:
+          type: string
+        userVerification:
+          type: string
+          const: required
+        timeout:
+          type: integer
+        allowCredentials:
+          type: array
+          items:
+            $ref: '#/components/schemas/CredentialDescriptor'
+      description: WebAuthn JSON for navigator.credentials.get; C has no allowCredentials.
+    RegistrationOptions:
+      type: object
+      required:
+        - challenge
+        - rp
+        - user
+        - pubKeyCredParams
+        - authenticatorSelection
+      properties:
+        challenge:
+          type: string
+        rp:
+          type: object
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+        user:
+          type: object
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+            displayName:
+              type: string
+        pubKeyCredParams:
+          type: array
+          items:
+            type: object
+            properties:
+              type:
+                type: string
+                const: public-key
+              alg:
+                type: integer
+        authenticatorSelection:
+          type: object
+          properties:
+            residentKey:
+              type: string
+              enum:
+                - discouraged
+                - required
+            userVerification:
+              type: string
+              const: required
+            authenticatorAttachment:
+              type: string
+              const: cross-platform
+        attestation:
+          type: string
+          const: direct
+        excludeCredentials:
+          type: array
+          items:
+            $ref: '#/components/schemas/CredentialDescriptor'
+        timeout:
+          type: integer
+        extensions:
+          type: object
+    RegistrationOptionsResult:
+      type: object
+      required:
+        - registrationId
+        - options
+        - expiresAt
+      properties:
+        registrationId:
+          type: string
+          format: uuid
+        options:
+          $ref: '#/components/schemas/RegistrationOptions'
+        expiresAt:
+          type: string
+          format: date-time
+    AuthenticationOptionsResult:
+      type: object
+      required:
+        - options
+        - expiresAt
+      properties:
+        options:
+          $ref: '#/components/schemas/AuthenticationOptions'
+        expiresAt:
+          type: string
+          format: date-time
+        proofId:
+          type: string
+          format: uuid
+    GrantRequest:
+      type: object
+      required:
+        - scope
+      properties:
+        scope:
+          type: string
+          enum:
+            - ENROLL
+            - REVOKE
+            - POLICY
+        password:
+          type: string
+          minLength: 1
+          maxLength: 128
+        code:
+          type: string
+          pattern: ^[0-9]{6}$
+      description: Recent full authentication suffices. Stale A may reauthenticate with password plus active TOTP. B/C require a new full login when stale.
+    GrantResult:
+      type: object
+      required:
+        - grant
+        - scope
+        - expiresAt
+      properties:
+        grant:
+          $ref: '#/components/schemas/Opaque'
+        scope:
+          type: string
+          enum:
+            - ENROLL
+            - REVOKE
+            - POLICY
+        expiresAt:
+          type: string
+          format: date-time
+    GrantOnly:
+      type: object
+      required:
+        - grant
+      properties:
+        grant:
+          $ref: '#/components/schemas/Opaque'
+    ProofRequest:
+      type: object
+      required:
+        - proofId
+        - response
+      properties:
+        proofId:
+          type: string
+          format: uuid
+        response:
+          $ref: '#/components/schemas/WebAuthnAssertion'
+    AssertionRequest:
+      type: object
+      required:
+        - response
+      properties:
+        response:
+          $ref: '#/components/schemas/WebAuthnAssertion'
+    CredentialState:
+      type: object
+      required:
+        - credentialId
+        - state
+      properties:
+        credentialId:
+          type: string
+          format: uuid
+        state:
+          type: string
+          enum:
+            - CANDIDATE
+            - ACTIVE
+    CStatus:
+      type: object
+      required:
+        - state
+        - expiresAt
+      properties:
+        state:
+          type: string
+          enum:
+            - PENDING_YUBIKEY
+            - PENDING_MOBILE
+            - APPROVED
+            - REJECTED
+            - CONSUMED
+            - VERIFIED_C
+            - EXPIRED
+            - CANCELLED
+        expiresAt:
+          type: string
+          format: date-time
+    MobilePending:
+      type: object
+      required:
+        - state
+        - transactionId
+        - capability
+        - expiresAt
+      properties:
+        state:
+          type: string
+          const: PENDING_MOBILE
+        transactionId:
+          type: string
+          format: uuid
+        capability:
+          $ref: '#/components/schemas/Opaque'
+        expiresAt:
+          type: string
+          format: date-time
+      description: QR JSON is {v:1,type:"login",token:capability,origin:trusted APP_ORIGIN}. Capability cannot poll, complete or obtain a web session.
+    MobilePublicJwk:
+      type: object
+      additionalProperties: false
+      required:
+        - kty
+        - crv
+        - x
+        - 'y'
+      properties:
+        kty:
+          type: string
+          const: EC
+        crv:
+          type: string
+          const: P-256
+        x:
+          type: string
+          pattern: ^[A-Za-z0-9_-]{43}$
+        'y':
+          type: string
+          pattern: ^[A-Za-z0-9_-]{43}$
+    CertificateChain:
+      type: array
+      minItems: 2
+      maxItems: 8
+      items:
+        type: string
+        maxLength: 16384
+        description: Base64 DER certificate
+    NativeChallenge:
+      type: object
+      required:
+        - challengeId
+        - signingInput
+        - expiresAt
+      properties:
+        challengeId:
+          type: string
+          format: uuid
+        signingInput:
+          type: string
+          description: Exact protected-header.payload JWS bytes. Do not reserialize JSON.
+        expiresAt:
+          type: string
+          format: date-time
+    NativeProof:
+      type: object
+      additionalProperties: false
+      required:
+        - challengeId
+        - proofJws
+      properties:
+        challengeId:
+          type: string
+          format: uuid
+        proofJws:
+          type: string
+          maxLength: 16384
+          description: ES256 compact JWS using paired device-auth key
+    Device:
+      type: object
+      required:
+        - id
+        - label
+        - status
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        label:
+          type: string
+        status:
+          type: string
+          enum:
+            - CANDIDATE
+            - AWAITING_PC_CONFIRMATION
+            - ACTIVE
+            - REVOKED
+        createdAt:
+          type: string
+          format: date-time
   responses:
     BadRequest:
       description: Invalid request body
       content:
         application/json:
-          schema: {$ref: '#/components/schemas/Error'}
+          schema:
+            $ref: '#/components/schemas/Error'
     Unauthorized:
       description: Invalid credentials, disallowed mode, missing/expired/consumed transaction, replay or missing/expired session
       content:
         application/json:
-          schema: {$ref: '#/components/schemas/Error'}
+          schema:
+            $ref: '#/components/schemas/Error'
     Forbidden:
       description: Missing/wrong Origin or unsupported Content-Type
     Limited:
       description: Five-minute attempt limit reached
+    Unavailable:
+      description: Mode disabled or trusted attestation/physical hardware release gate not configured
 paths:
   /api/health:
     get:
@@ -56,71 +510,127 @@ paths:
               schema:
                 type: object
                 properties:
-                  status: {type: string, const: ok}
-                  modes: {type: array, items: {type: string, const: A}}
+                  status:
+                    type: string
+                    const: ok
+                  modes:
+                    type: array
+                    items:
+                      type: string
+                      enum:
+                        - A
+                        - B
+                        - C
   /api/auth/register:
     post:
       operationId: register
-      description: Creates a unique account with an 8–128-character password, issues a Secure/HttpOnly/SameSite=Strict eight-hour session, and leaves TOTP optional until activated from that session.
+      description: >-
+        Creates a unique account with an 8–128-character password, issues a Secure/HttpOnly/SameSite=Strict eight-hour session, and leaves TOTP optional until
+        activated from that session.
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [username, password]
+              required:
+                - username
+                - password
               properties:
-                username: {type: string, pattern: '^[a-z0-9][a-z0-9._-]{2,63}$', maxLength: 64}
-                password: {type: string, minLength: 8, maxLength: 128}
+                username:
+                  type: string
+                  pattern: ^[a-z0-9][a-z0-9._-]{2,63}$
+                  maxLength: 64
+                password:
+                  type: string
+                  minLength: 8
+                  maxLength: 128
       responses:
         '201':
           description: Account created and signed in
           headers:
-            Set-Cookie: {schema: {type: string}, description: __Host-bio_session; Secure; HttpOnly; SameSite=Strict; Path=/; Expires=...}
+            Set-Cookie:
+              schema:
+                type: string
+              description: __Host-bio_session; Secure; HttpOnly; SameSite=Strict; Path=/; Expires=...
           content:
             application/json:
-              schema: {$ref: '#/components/schemas/UserSession'}
-        '400': {$ref: '#/components/responses/BadRequest'}
-        '403': {$ref: '#/components/responses/Forbidden'}
-        '409': {description: Username is unavailable}
-        '429': {$ref: '#/components/responses/Limited'}
+              schema:
+                $ref: '#/components/schemas/UserSession'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Username is unavailable
+        '429':
+          $ref: '#/components/responses/Limited'
   /api/auth/password:
     post:
       operationId: verifyPassword
-      description: Verifies password and backend policy. If TOTP is active, issues a five-minute pending cookie; otherwise, issues an eight-hour session. Replaces the calling browser's old pending transaction.
+      description: >-
+        Verifies password and backend policy. If TOTP is active, issues a five-minute pending cookie; otherwise, issues an eight-hour session. Replaces the
+        calling browser's old pending transaction.
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [username, password]
+              required:
+                - username
+                - password
               properties:
-                username: {type: string, pattern: '^[a-z0-9][a-z0-9._-]{2,63}$', maxLength: 64}
-                password: {type: string, minLength: 1, maxLength: 128}
+                username:
+                  type: string
+                  pattern: ^[a-z0-9][a-z0-9._-]{2,63}$
+                  maxLength: 64
+                password:
+                  type: string
+                  minLength: 1
+                  maxLength: 128
       responses:
         '201':
           description: Pending authentication created
           headers:
-            Set-Cookie: {schema: {type: string}, description: __Host-bio_pending; Secure; HttpOnly; SameSite=Strict; Path=/; Expires=...}
+            Set-Cookie:
+              schema:
+                type: string
+              description: __Host-bio_pending; Secure; HttpOnly; SameSite=Strict; Path=/; Expires=...
           content:
             application/json:
               schema:
                 type: object
-                required: [step, expiresAt]
+                required:
+                  - step
+                  - expiresAt
                 properties:
-                  step: {type: string, enum: [done, totp]}
-                  expiresAt: {type: string, format: date-time}
-                  user: {$ref: '#/components/schemas/UserSession'}
-        '400': {$ref: '#/components/responses/BadRequest'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '403': {$ref: '#/components/responses/Forbidden'}
-        '429': {$ref: '#/components/responses/Limited'}
+                  step:
+                    type: string
+                    enum:
+                      - done
+                      - totp
+                  expiresAt:
+                    type: string
+                    format: date-time
+                  user:
+                    $ref: '#/components/schemas/UserSession'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/Limited'
   /api/auth/enrollment:
     get:
       operationId: getTotpSetup
-      security: [{session: []}]
-      description: Returns setup material only to a signed-in account that has not enabled TOTP. Secret and QR must never be cached, logged, or sent to an external QR service.
+      security:
+        - session: []
+      description: >-
+        Returns setup material only to a signed-in account that has not enabled TOTP. Secret and QR must never be cached, logged, or sent to an external QR
+        service.
       responses:
         '200':
           description: Initial enrollment material
@@ -128,16 +638,25 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [secret, qr]
+                required:
+                  - secret
+                  - qr
                 properties:
-                  secret: {type: string, description: Base32 TOTP secret}
-                  qr: {type: string, description: Locally generated PNG data URL}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '409': {description: TOTP is already active}
+                  secret:
+                    type: string
+                    description: Base32 TOTP secret
+                  qr:
+                    type: string
+                    description: Locally generated PNG data URL
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: TOTP is already active
   /api/auth/totp/activate:
     post:
       operationId: activateTotp
-      security: [{session: []}]
+      security:
+        - session: []
       description: Verifies the first six-digit TOTP code and activates the factor. The account row is locked to prevent replay during simultaneous setup requests.
       requestBody:
         required: true
@@ -145,53 +664,79 @@ paths:
           application/json:
             schema:
               type: object
-              required: [code]
+              required:
+                - code
               properties:
-                code: {type: string, pattern: '^[0-9]{6}$'}
+                code:
+                  type: string
+                  pattern: ^[0-9]{6}$
       responses:
-        '201': {description: TOTP is active}
-        '400': {$ref: '#/components/responses/BadRequest'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '403': {$ref: '#/components/responses/Forbidden'}
-        '409': {description: TOTP is already active}
-        '429': {$ref: '#/components/responses/Limited'}
+        '201':
+          description: TOTP is active
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: TOTP is already active
+        '429':
+          $ref: '#/components/responses/Limited'
   /api/auth/totp:
     post:
       operationId: completeModeA
-      security: [{pending: []}]
-      description: SHA-1 / six digits / 30 seconds / ±30-second tolerance. At most five attempts per pending transaction and ten per account per five minutes. Atomically consumes pending, advances account timestep and creates an eight-hour session. TOTP must already be active.
+      security:
+        - pending: []
+      description: >-
+        SHA-1 / six digits / 30 seconds / ±30-second tolerance. At most five attempts per pending transaction and ten per account per five minutes. Atomically
+        consumes pending, advances account timestep and creates an eight-hour session. TOTP must already be active.
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [code]
+              required:
+                - code
               properties:
-                code: {type: string, pattern: '^[0-9]{6}$'}
+                code:
+                  type: string
+                  pattern: ^[0-9]{6}$
       responses:
         '201':
           description: Authenticated; pending cookie cleared and session cookie issued
           headers:
-            Set-Cookie: {schema: {type: string}, description: __Host-bio_session; Secure; HttpOnly; SameSite=Strict; Path=/; Expires=...}
+            Set-Cookie:
+              schema:
+                type: string
+              description: __Host-bio_session; Secure; HttpOnly; SameSite=Strict; Path=/; Expires=...
           content:
             application/json:
-              schema: {$ref: '#/components/schemas/UserSession'}
-        '400': {$ref: '#/components/responses/BadRequest'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '403': {$ref: '#/components/responses/Forbidden'}
-        '429': {$ref: '#/components/responses/Limited'}
+              schema:
+                $ref: '#/components/schemas/UserSession'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/Limited'
   /api/auth/me:
     get:
       operationId: currentSession
-      security: [{session: []}]
+      security:
+        - session: []
       responses:
         '200':
-          description: Active session whose account still allows A
+          description: Active session whose actual factor evidence, active credentials, security version and account mode policy remain valid
           content:
             application/json:
-              schema: {$ref: '#/components/schemas/UserSession'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
+              schema:
+                $ref: '#/components/schemas/UserSession'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
   /api/auth/logout:
     post:
       operationId: logout
@@ -199,11 +744,1563 @@ paths:
       requestBody:
         content:
           application/json:
-            schema: {type: object}
+            schema:
+              type: object
       responses:
         '201':
           description: Logged out
           content:
             application/json:
-              schema: {type: object, properties: {ok: {type: boolean, const: true}}}
-        '403': {$ref: '#/components/responses/Forbidden'}
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    const: true
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/auth/capabilities:
+    get:
+      operationId: authCapabilities
+      summary: Configured server release gates; does not reveal account-specific modes
+      security: []
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - modes
+                  - webauthnEnabled
+                  - modeCEnabled
+                properties:
+                  modes:
+                    type: array
+                    items:
+                      type: string
+                      enum:
+                        - A
+                        - B
+                        - C
+                  webauthnEnabled:
+                    type: boolean
+                  modeCEnabled:
+                    type: boolean
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Conflict, consumed proof or unavailable prerequisite
+        '429':
+          $ref: '#/components/responses/Limited'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /api/account/reauth:
+    post:
+      operationId: reauthenticate
+      summary: Issue one-use, five-minute action grant bound to current full fresh session
+      security:
+        - session: []
+      responses:
+        '201':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GrantResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Conflict, consumed proof or unavailable prerequisite
+        '429':
+          $ref: '#/components/responses/Limited'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GrantRequest'
+  /api/account/webauthn:
+    get:
+      operationId: listCredentials
+      summary: List only this account credentials
+      security:
+        - session: []
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - credentials
+                properties:
+                  credentials:
+                    type: array
+                    items:
+                      type: object
+                      additionalProperties: false
+                      required:
+                        - id
+                        - profile
+                        - state
+                        - createdAt
+                        - proofAt
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                        profile:
+                          type: string
+                          enum:
+                            - B
+                            - C
+                        state:
+                          type: string
+                          enum:
+                            - CANDIDATE
+                            - ACTIVE
+                            - REVOKED
+                        createdAt:
+                          type: string
+                          format: date-time
+                        proofAt:
+                          type:
+                            - string
+                            - 'null'
+                          format: date-time
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Conflict, consumed proof or unavailable prerequisite
+        '429':
+          $ref: '#/components/responses/Limited'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /api/account/webauthn/registrations/options:
+    post:
+      operationId: credentialRegistrationOptions
+      summary: Consume ENROLL grant; create purpose/account/session-bound registration
+      security:
+        - session: []
+      responses:
+        '201':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegistrationOptionsResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Conflict, consumed proof or unavailable prerequisite
+        '429':
+          $ref: '#/components/responses/Limited'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - profile
+                - grant
+              properties:
+                profile:
+                  type: string
+                  enum:
+                    - B
+                    - C
+                grant:
+                  $ref: '#/components/schemas/Opaque'
+  /api/account/webauthn/registrations/verify:
+    post:
+      operationId: credentialRegistrationVerify
+      summary: Verify UP/UV and trusted YubiKey packed attestation; store candidate only
+      security:
+        - session: []
+      responses:
+        '201':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CredentialState'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Conflict, consumed proof or unavailable prerequisite
+        '429':
+          $ref: '#/components/responses/Limited'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - registrationId
+                - response
+              properties:
+                registrationId:
+                  type: string
+                  format: uuid
+                response:
+                  $ref: '#/components/schemas/WebAuthnRegistration'
+  /api/account/webauthn/activations/options:
+    post:
+      operationId: credentialActivationOptions
+      summary: Fresh account session proves candidate credential possession before activation
+      security:
+        - session: []
+      responses:
+        '201':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthenticationOptionsResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Conflict, consumed proof or unavailable prerequisite
+        '429':
+          $ref: '#/components/responses/Limited'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - credentialId
+              properties:
+                credentialId:
+                  type: string
+                  format: uuid
+  /api/account/webauthn/activations/verify:
+    post:
+      operationId: credentialActivationVerify
+      summary: One-use assertion activates candidate without issuing a login session or changing modes
+      security:
+        - session: []
+      responses:
+        '201':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CredentialState'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Conflict, consumed proof or unavailable prerequisite
+        '429':
+          $ref: '#/components/responses/Limited'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProofRequest'
+  /api/account/webauthn/proofs/options:
+    post:
+      operationId: pairingYubiKeyOptions
+      summary: Fresh session and active C credential authorize a pairing proof
+      security:
+        - session: []
+      responses:
+        '201':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthenticationOptionsResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Conflict, consumed proof or unavailable prerequisite
+        '429':
+          $ref: '#/components/responses/Limited'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - purpose
+              properties:
+                purpose:
+                  type: string
+                  const: PAIRING
+  /api/account/webauthn/proofs/verify:
+    post:
+      operationId: pairingYubiKeyVerify
+      summary: Create short-lived session-bound PAIRING proof; not a login session
+      security:
+        - session: []
+      responses:
+        '201':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - proofId
+                  - verified
+                properties:
+                  proofId:
+                    type: string
+                    format: uuid
+                  verified:
+                    type: boolean
+                    const: true
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Conflict, consumed proof or unavailable prerequisite
+        '429':
+          $ref: '#/components/responses/Limited'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProofRequest'
+  /api/account/webauthn/{id}/revoke:
+    post:
+      operationId: revokeCredential
+      summary: Consume REVOKE grant, revoke credential and dependent evidence; reject last required key removal
+      security:
+        - session: []
+      responses:
+        '201':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - revoked
+                properties:
+                  revoked:
+                    type: boolean
+                    const: true
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Conflict, consumed proof or unavailable prerequisite
+        '429':
+          $ref: '#/components/responses/Limited'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GrantOnly'
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+  /api/account/policy:
+    post:
+      operationId: updateAccountPolicy
+      summary: Consume POLICY grant and invalidate old sessions; enabling C needs completed both-factor C_ACTIVATION proof
+      security:
+        - session: []
+      responses:
+        '201':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - allowedModes
+                  - reauthenticationRequired
+                properties:
+                  allowedModes:
+                    type: array
+                    items:
+                      type: string
+                      enum:
+                        - A
+                        - B
+                        - C
+                  reauthenticationRequired:
+                    type: boolean
+                    const: true
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Conflict, consumed proof or unavailable prerequisite
+        '429':
+          $ref: '#/components/responses/Limited'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - allowedModes
+                - grant
+              properties:
+                allowedModes:
+                  type: array
+                  minItems: 1
+                  maxItems: 3
+                  uniqueItems: true
+                  items:
+                    type: string
+                    enum:
+                      - A
+                      - B
+                      - C
+                grant:
+                  $ref: '#/components/schemas/Opaque'
+                activationProofId:
+                  type: string
+                  format: uuid
+  /api/auth/b/password:
+    post:
+      operationId: modeBPassword
+      summary: Password and backend B policy create only a 120-second B pending cookie; A/TOTP cannot complete it
+      security: []
+      responses:
+        '201':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - step
+                  - expiresAt
+                properties:
+                  step:
+                    type: string
+                    const: webauthn
+                  expiresAt:
+                    type: string
+                    format: date-time
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Conflict, consumed proof or unavailable prerequisite
+        '429':
+          $ref: '#/components/responses/Limited'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - username
+                - password
+              properties:
+                username:
+                  type: string
+                  pattern: ^[a-z0-9][a-z0-9._-]{2,63}$
+                password:
+                  type: string
+                  minLength: 1
+                  maxLength: 128
+  /api/auth/b/options:
+    post:
+      operationId: modeBOptions
+      summary: Rotate WebAuthn challenge; allow only the pending account active B credentials
+      security:
+        - pending: []
+      responses:
+        '201':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthenticationOptionsResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Conflict, consumed proof or unavailable prerequisite
+        '429':
+          $ref: '#/components/responses/Limited'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: []
+              properties: {}
+  /api/auth/b/verify:
+    post:
+      operationId: modeBComplete
+      summary: Verify required UP/UV and atomically consume pending, advance counter and issue evidenced B session
+      security:
+        - pending: []
+      responses:
+        '201':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserSession'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Conflict, consumed proof or unavailable prerequisite
+        '429':
+          $ref: '#/components/responses/Limited'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssertionRequest'
+  /api/auth/c/options:
+    post:
+      operationId: modeCOptions
+      summary: Discoverable UP/UV challenge and pending cookie; C_ACTIVATION also requires fresh browser session and never issues login session
+      security: []
+      responses:
+        '201':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthenticationOptionsResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Conflict, consumed proof or unavailable prerequisite
+        '429':
+          $ref: '#/components/responses/Limited'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: []
+              properties:
+                purpose:
+                  type: string
+                  enum:
+                    - LOGIN
+                    - C_ACTIVATION
+                  default: LOGIN
+  /api/auth/c/verify:
+    post:
+      operationId: modeCVerifyYubiKey
+      summary: Bind verified discoverable C credential/account once; create 120-second mobile challenge without issuing session
+      security:
+        - pending: []
+      responses:
+        '201':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MobilePending'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Conflict, consumed proof or unavailable prerequisite
+        '429':
+          $ref: '#/components/responses/Limited'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssertionRequest'
+  /api/auth/c/status:
+    get:
+      operationId: modeCStatus
+      summary: Only original browser pending cookie can poll; QR capability confers no polling right
+      security:
+        - pending: []
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CStatus'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Conflict, consumed proof or unavailable prerequisite
+        '429':
+          $ref: '#/components/responses/Limited'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+      parameters:
+        - name: transactionId
+          in: query
+          required: true
+          description: Expected public transaction ID. Cookie remains authoritative; mismatches reject stale tabs.
+          schema:
+            type: string
+            format: uuid
+  /api/auth/c/complete:
+    post:
+      operationId: modeCComplete
+      summary: Original browser atomically consumes both factors; activation returns only a policy proof
+      security:
+        - pending: []
+      responses:
+        '201':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/UserSession'
+                  - type: object
+                    additionalProperties: false
+                    required:
+                      - activationProofId
+                      - verified
+                    properties:
+                      activationProofId:
+                        type: string
+                        format: uuid
+                      verified:
+                        type: boolean
+                        const: true
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Conflict, consumed proof or unavailable prerequisite
+        '429':
+          $ref: '#/components/responses/Limited'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - transactionId
+              properties:
+                transactionId:
+                  type: string
+                  format: uuid
+  /api/auth/c/cancel:
+    post:
+      operationId: modeCCancel
+      summary: Cancel this browser pending transaction without weakening policy
+      security:
+        - pending: []
+      responses:
+        '201':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - cancelled
+                properties:
+                  cancelled:
+                    type: boolean
+                    const: true
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Conflict, consumed proof or unavailable prerequisite
+        '429':
+          $ref: '#/components/responses/Limited'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - transactionId
+              properties:
+                transactionId:
+                  type: string
+                  format: uuid
+  /api/account/pairings:
+    post:
+      operationId: startPairing
+      summary: Consume ENROLL grant and PAIRING YubiKey proof; return one-use QR capability
+      security:
+        - session: []
+      responses:
+        '201':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - pairingId
+                  - pairingToken
+                  - expiresAt
+                  - qr
+                properties:
+                  pairingId:
+                    type: string
+                    format: uuid
+                  pairingToken:
+                    $ref: '#/components/schemas/Opaque'
+                  expiresAt:
+                    type: string
+                    format: date-time
+                  qr:
+                    type: object
+                    additionalProperties: false
+                    required:
+                      - v
+                      - type
+                      - token
+                      - origin
+                    properties:
+                      v:
+                        type: integer
+                        const: 1
+                      type:
+                        type: string
+                        const: pairing
+                      token:
+                        $ref: '#/components/schemas/Opaque'
+                      origin:
+                        type: string
+                        format: uri
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Conflict, consumed proof or unavailable prerequisite
+        '429':
+          $ref: '#/components/responses/Limited'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - proofId
+                - grant
+              properties:
+                proofId:
+                  type: string
+                  format: uuid
+                grant:
+                  $ref: '#/components/schemas/Opaque'
+  /api/account/pairings/{id}:
+    get:
+      operationId: pairingStatus
+      summary: Original fresh browser session may see key-bound comparison code after proof of both candidate keys
+      security:
+        - session: []
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - pairingId
+                  - status
+                  - expiresAt
+                properties:
+                  pairingId:
+                    type: string
+                    format: uuid
+                  status:
+                    type: string
+                    enum:
+                      - PENDING
+                      - CANDIDATE
+                      - AWAITING_PC_CONFIRMATION
+                      - CONFIRMED
+                      - CANCELLED
+                      - EXPIRED
+                  expiresAt:
+                    type: string
+                    format: date-time
+                  candidate:
+                    type: object
+                    additionalProperties: false
+                    required:
+                      - deviceId
+                      - label
+                      - confirmationCode
+                    properties:
+                      deviceId:
+                        type: string
+                        format: uuid
+                      label:
+                        type: string
+                      confirmationCode:
+                        type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Conflict, consumed proof or unavailable prerequisite
+        '429':
+          $ref: '#/components/responses/Limited'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+  /api/account/pairings/{id}/confirm:
+    post:
+      operationId: confirmPairing
+      summary: Original fresh browser explicitly confirms matching candidate key code; activates only trusted proved device
+      security:
+        - session: []
+      responses:
+        '201':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - status
+                  - deviceId
+                properties:
+                  status:
+                    type: string
+                    const: CONFIRMED
+                  deviceId:
+                    type: string
+                    format: uuid
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Conflict, consumed proof or unavailable prerequisite
+        '429':
+          $ref: '#/components/responses/Limited'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - deviceId
+                - confirmationCode
+              properties:
+                deviceId:
+                  type: string
+                  format: uuid
+                confirmationCode:
+                  type: string
+                  pattern: ^[A-Za-z0-9_-]{8}-[A-Za-z0-9_-]{8}$
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+  /api/account/devices:
+    get:
+      operationId: listDevices
+      summary: List paired/candidate/revoked device metadata belonging to this session account
+      security:
+        - session: []
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Device'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Conflict, consumed proof or unavailable prerequisite
+        '429':
+          $ref: '#/components/responses/Limited'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /api/account/devices/{id}/revoke:
+    post:
+      operationId: revokeDevice
+      summary: Consume REVOKE grant, revoke device and invalidate transactions/sessions without fallback
+      security:
+        - session: []
+      responses:
+        '201':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - revoked
+                properties:
+                  revoked:
+                    type: boolean
+                    const: true
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Conflict, consumed proof or unavailable prerequisite
+        '429':
+          $ref: '#/components/responses/Limited'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GrantOnly'
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+  /api/mobile/pairings/resolve:
+    post:
+      operationId: resolvePairing
+      summary: 'Resolve only narrow enrollment challenge from one-use pairing capability. Native endpoint: reject browser cookies; Origin is not authentication.'
+      security: []
+      responses:
+        '201':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - pairingId
+                  - attestationChallenge
+                  - expiresAt
+                  - serviceOrigin
+                properties:
+                  pairingId:
+                    type: string
+                    format: uuid
+                  attestationChallenge:
+                    type: string
+                  expiresAt:
+                    type: string
+                    format: date-time
+                  serviceOrigin:
+                    type: string
+                    format: uri
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Conflict, consumed proof or unavailable prerequisite
+        '429':
+          $ref: '#/components/responses/Limited'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - pairingToken
+              properties:
+                pairingToken:
+                  $ref: '#/components/schemas/Opaque'
+  /api/mobile/pairings/candidate:
+    post:
+      operationId: proposeDevice
+      summary: >-
+        Validate fresh Android hardware attestation for distinct auth/approval keys before accepting candidate. Native endpoint: reject browser cookies; Origin
+        is not authentication.
+      security: []
+      responses:
+        '201':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - deviceId
+                  - challengeId
+                  - signingInput
+                  - confirmationCode
+                  - expiresAt
+                properties:
+                  deviceId:
+                    type: string
+                    format: uuid
+                  challengeId:
+                    type: string
+                    format: uuid
+                  signingInput:
+                    type: string
+                  confirmationCode:
+                    type: string
+                  expiresAt:
+                    type: string
+                    format: date-time
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Conflict, consumed proof or unavailable prerequisite
+        '429':
+          $ref: '#/components/responses/Limited'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - pairingToken
+                - label
+                - approvalPublicJwk
+                - authPublicJwk
+                - approvalAttestation
+                - authAttestation
+              properties:
+                pairingToken:
+                  $ref: '#/components/schemas/Opaque'
+                label:
+                  type: string
+                  minLength: 1
+                  maxLength: 80
+                approvalPublicJwk:
+                  $ref: '#/components/schemas/MobilePublicJwk'
+                authPublicJwk:
+                  $ref: '#/components/schemas/MobilePublicJwk'
+                approvalAttestation:
+                  $ref: '#/components/schemas/CertificateChain'
+                authAttestation:
+                  $ref: '#/components/schemas/CertificateChain'
+  /api/mobile/pairings/prove:
+    post:
+      operationId: proveDevice
+      summary: >-
+        Prove both candidate keys over exact PAIRING_PROOF signing input; approval key use requires biometric authorization. Native endpoint: reject browser
+        cookies; Origin is not authentication.
+      security: []
+      responses:
+        '201':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - deviceId
+                  - confirmationCode
+                  - status
+                properties:
+                  deviceId:
+                    type: string
+                    format: uuid
+                  confirmationCode:
+                    type: string
+                  status:
+                    type: string
+                    const: AWAITING_PC_CONFIRMATION
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Conflict, consumed proof or unavailable prerequisite
+        '429':
+          $ref: '#/components/responses/Limited'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - pairingToken
+                - challengeId
+                - approvalJws
+                - authJws
+              properties:
+                pairingToken:
+                  $ref: '#/components/schemas/Opaque'
+                challengeId:
+                  type: string
+                  format: uuid
+                approvalJws:
+                  type: string
+                  maxLength: 16384
+                authJws:
+                  type: string
+                  maxLength: 16384
+  /api/mobile/auth/challenge:
+    post:
+      operationId: mobileAuthChallenge
+      summary: >-
+        Create one-use request-bound device-auth challenge; QR alone cannot disclose account or decide login. Native endpoint: reject browser cookies; Origin is
+        not authentication.
+      security: []
+      responses:
+        '201':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NativeChallenge'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Conflict, consumed proof or unavailable prerequisite
+        '429':
+          $ref: '#/components/responses/Limited'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - deviceId
+                - transactionToken
+                - operation
+              properties:
+                deviceId:
+                  type: string
+                  format: uuid
+                transactionToken:
+                  $ref: '#/components/schemas/Opaque'
+                operation:
+                  type: string
+                  enum:
+                    - resolve
+                    - reject
+  /api/mobile/auth/resolve:
+    post:
+      operationId: resolveMobileLogin
+      summary: >-
+        Consume signed LOGIN_RESOLVE proof and return trusted account detail and exact approval signing input. Native endpoint: reject browser cookies; Origin
+        is not authentication.
+      security: []
+      responses:
+        '201':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - transactionId
+                  - username
+                  - serviceOrigin
+                  - expiresAt
+                  - challengeId
+                  - signingInput
+                properties:
+                  transactionId:
+                    type: string
+                    format: uuid
+                  username:
+                    type: string
+                  serviceOrigin:
+                    type: string
+                    format: uri
+                  expiresAt:
+                    type: string
+                    format: date-time
+                  challengeId:
+                    type: string
+                    format: uuid
+                  signingInput:
+                    type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Conflict, consumed proof or unavailable prerequisite
+        '429':
+          $ref: '#/components/responses/Limited'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NativeProof'
+  /api/mobile/auth/approve:
+    post:
+      operationId: approveMobileLogin
+      summary: >-
+        Consume biometric approval-key ES256 JWS; transition only same-account transaction to APPROVED; never return web cookie. Native endpoint: reject browser
+        cookies; Origin is not authentication.
+      security: []
+      responses:
+        '201':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - status
+                properties:
+                  status:
+                    type: string
+                    const: APPROVED
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Conflict, consumed proof or unavailable prerequisite
+        '429':
+          $ref: '#/components/responses/Limited'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - challengeId
+                - approvalJws
+              properties:
+                challengeId:
+                  type: string
+                  format: uuid
+                approvalJws:
+                  type: string
+                  maxLength: 16384
+  /api/mobile/auth/reject:
+    post:
+      operationId: rejectMobileLogin
+      summary: 'Consume separate purpose-bound device-auth rejection; cannot approve a login. Native endpoint: reject browser cookies; Origin is not authentication.'
+      security: []
+      responses:
+        '201':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - status
+                properties:
+                  status:
+                    type: string
+                    const: REJECTED
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Conflict, consumed proof or unavailable prerequisite
+        '429':
+          $ref: '#/components/responses/Limited'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NativeProof'
+  /api/mobile/devices/challenge:
+    post:
+      operationId: deviceStatusChallenge
+      summary: 'Create one-use device-auth status challenge. Native endpoint: reject browser cookies; Origin is not authentication.'
+      security: []
+      responses:
+        '201':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NativeChallenge'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Conflict, consumed proof or unavailable prerequisite
+        '429':
+          $ref: '#/components/responses/Limited'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - deviceId
+              properties:
+                deviceId:
+                  type: string
+                  format: uuid
+  /api/mobile/devices/status:
+    post:
+      operationId: deviceStatus
+      summary: >-
+        Consume signed status challenge; allow owner to learn revocation state without leaking public account details. Native endpoint: reject browser cookies;
+        Origin is not authentication.
+      security: []
+      responses:
+        '201':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - deviceId
+                  - status
+                properties:
+                  deviceId:
+                    type: string
+                    format: uuid
+                  status:
+                    type: string
+                    enum:
+                      - CANDIDATE
+                      - AWAITING_PC_CONFIRMATION
+                      - ACTIVE
+                      - REVOKED
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Conflict, consumed proof or unavailable prerequisite
+        '429':
+          $ref: '#/components/responses/Limited'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NativeProof'

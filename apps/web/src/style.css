@@ -228,3 +228,12 @@ button, select, summary { cursor: pointer; }
   .hero-line[data-typing="true"]::after { display: none; }
   .shell::before { transform: none; }
 }
+.mode-selector { display: flex; gap: 8px; margin-block: 16px; }
+.panel .mode-selector button { flex: 1; min-width: 0; padding-inline: 10px; margin-top: 0; }
+.mode-selector button[aria-pressed="true"] { outline: 2px solid currentColor; outline-offset: 2px; }
+.security-panel { border-top: 1px solid #d9dce0; margin-top: 20px; padding-top: 12px; }
+.security-panel fieldset { border: 1px solid #d9dce0; padding: 12px; margin-top: 20px; }
+.security-panel .mode-choice { display: flex; align-items: center; gap: 10px; }
+.security-panel .mode-choice input { width: 20px; height: 20px; }
+.security-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding-block: 8px; border-bottom: 1px solid #d9dce0; }
+.security-actions { display: grid; grid-template-columns: 1fr; gap: 4px; }

@@ -5,7 +5,7 @@ import { AuthService } from './auth.service.js';
 export const sessionCookie = '__Host-bio_session';
 export const pendingCookie = '__Host-bio_pending';
 const cookies = { secure: true, httpOnly: true, sameSite: 'strict' as const, path: '/' };
-function field(body: unknown, name: string, pattern: RegExp, max: number) {
+export function field(body: unknown, name: string, pattern: RegExp, max: number) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) throw new BadRequestException('Neplatný formulár.');
   const value = (body as Record<string, unknown>)[name];
   if (typeof value !== 'string' || value.length > max || !pattern.test(value)) throw new BadRequestException('Skontrolujte vyplnené údaje.');
@@ -19,7 +19,7 @@ export class AuthController {
   @Post('auth/register') async register(@Body() body: unknown, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const username = field(body, 'username', /^[a-z0-9][a-z0-9._-]{2,63}$/, 64);
     const password = field(body, 'password', /^[\s\S]{8,128}$/, 128);
-    const result = await this.auth.register(username, password, req.ip ?? 'unknown', req.cookies[sessionCookie]);
+    const result = await this.auth.register(username, password, req.ip ?? 'unknown', req.cookies[sessionCookie], req.cookies[pendingCookie]);
     res.clearCookie(pendingCookie, cookies);
     res.cookie(sessionCookie, result.sessionToken, { ...cookies, expires: result.user.expiresAt });
     return result.user;
@@ -43,13 +43,18 @@ export class AuthController {
   @Post('auth/totp') async totp(@Body() body: unknown, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const code = field(body, 'code', /^\d{6}$/, 6);
     const { sessionToken, ...result } = await this.auth.totp(req.cookies[pendingCookie], code);
-    const oldSession = req.cookies[sessionCookie];
-    if (oldSession) await this.auth.logout(oldSession);
     res.clearCookie(pendingCookie, cookies);
     res.cookie(sessionCookie, sessionToken, { ...cookies, expires: result.expiresAt });
     return result;
   }
   @Get('auth/me') me(@Req() req: Request) { return this.auth.me(req.cookies[sessionCookie]); }
+  @Post('account/reauth') async reauth(@Body() body: unknown, @Req() req: Request) {
+    const scope = field(body, 'scope', /^(ENROLL|REVOKE|POLICY)$/, 6);
+    const value = body as Record<string, unknown>;
+    const password = value.password === undefined ? undefined : field(body, 'password', /^[\s\S]{1,128}$/, 128);
+    const code = value.code === undefined ? undefined : field(body, 'code', /^\d{6}$/, 6);
+    return this.auth.reauthenticate(req.cookies[sessionCookie], scope, password, code);
+  }
   @Post('auth/logout') async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     await this.auth.logout(req.cookies[sessionCookie], req.cookies[pendingCookie]);
     res.clearCookie(sessionCookie, cookies); res.clearCookie(pendingCookie, cookies);

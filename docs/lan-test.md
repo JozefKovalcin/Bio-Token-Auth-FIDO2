@@ -109,4 +109,4 @@ Pre vývoj s vlastnou testovacou databázou: Node 24+, pnpm 11.25.0, `pnpm insta
 
 `docker compose down` zastaví aplikáciu a zachová databázu aj CA vo volumes. Použitie `down -v` tieto údaje zmaže. Po zmene IP upravte APP_HOST v `.env` a znovu vytvorte kontajnery; používajte novú URL. Nevymazávajte pritom TOTP_ENCRYPTION_KEY ani volume Caddy.
 
-Režimy B/C zostávajú naplánované a v UI sú označené ako nedostupné. Server povoľuje A iba účtom s `allowedModes` obsahujúcim `A`; klient túto politiku nezmení. Obnova účtu, správa faktorov a kompletný trvalý audit ešte nie sú implementované. Toto je LAN výskumný prototyp, nie hotové verejné nasadenie.
+Režimy B/C majú softvérovú implementáciu, ale predvolene sú vypnuté do konfigurácie dôvery a hardvérového overenia. Postup pre DNS, YubiKey a Android je v modes-b-c.md. Server povoľuje A iba účtom s `allowedModes` obsahujúcim `A`; klient túto politiku nezmení. Správa faktorov a klasifikovaný audit sú implementované; samoobslužná obnova nie je dostupná. Toto je LAN výskumný prototyp, nie hotové verejné nasadenie.

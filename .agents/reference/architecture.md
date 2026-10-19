@@ -1,3 +1,5 @@
 # Architektúra
 
-Pozri [projekt](../../docs/architecture.md) a [Android plán](../../apps/android/README.md). Android je zatiaľ scaffold v apps/android. Kotlin logiku oddeľte od platformovej biometrie a Keystore. UI prijíma immutable state a callbacks; state holder spravuje lifecycle, Flow a efekty. Upstream generátor tu neexistuje; pred pridaním modulov navrhnite skutočný build a namespace projektu.
+Pozri projektovú dokumentáciu v docs/architecture.md, ADR 0002 a apps/android/README.md. Android má samostatný Gradle build s :app (Compose, ViewModel, Keystore, biometria, kamera) a :core (Kotlin/JVM kontrakt, JOSE a HTTP). UI prijíma immutable state a callbacks; stavový holder spravuje StateFlow a operácie. MainActivity koordinuje CryptoObject prompt, čisté ApprovalScreen nevykonáva sieť ani kryptografiu.
+
+API, politika session a mobilné operácie sú oddelené NestJS moduly. Interný JVM verifier používa oficiálnu Android Key Attestation knižnicu. Serverová politika rozhoduje o dostupných režimoch; fyzické akceptačné overenie zostáva samostatnou bránou. Upstream generátor ani convention plugins neexistujú.

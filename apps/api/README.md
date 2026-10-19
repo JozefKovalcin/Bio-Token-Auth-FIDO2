@@ -1,6 +1,8 @@
 # API
 
-Serverové aplikačné programovacie rozhranie (API, Application Programming Interface) používa NestJS, Prisma ORM 7.10.1 a PostgreSQL. Implementuje registráciu a režim A. Pri registrácii sa vytvorí účet s heslom; používateľ môže aktivovať TOTP a po aktivácii ho server vyžaduje pri každom novom prihlásení. Režimy B/C zatiaľ nie sú implementované.
+Serverové API používa NestJS, Prisma ORM 7.10.1 a PostgreSQL. Obsahuje A, WebAuthn enrollment/prihlásenie B/C, čerstvé účelové grants, správu politiky a faktorov, párovanie, mobilné JWS dôkazy a atomické dokončenie C. Moduly sú oddelené v `src/auth-modules.ts`; politika session je v `src/session-policy.service.ts`. Mobilné routy odmietajú browser cookies a vyžadujú vlastné kryptografické dôkazy.
+
+B/C sú predvolene vypnuté. Vyžadujú [konfiguráciu dôvery a akceptačné overenie](../../docs/modes-b-c.md). Automatické testy s testovým enrollment trust boundary nepotvrdzujú fyzickú YubiKey atestáciu; C testové fixtures nenahrádzajú skutočnú Android atestáciu a biometriu.
 
 Súbor `src/auth.controller.ts` prijíma HTTP požiadavky, overuje vstupy a spravuje cookies. `src/auth.service.ts` vykonáva autentifikačný tok a databázové operácie. Databázová schéma a migrácie sú v `prisma/`. API kontrakt je opísaný v [OpenAPI dokumente](../../packages/contracts/openapi.yaml).
 

@@ -22,6 +22,16 @@ services:
       DATABASE_URL: postgresql://bio_auth:${POSTGRES_PASSWORD}@db:5432/bio_auth
       APP_ORIGIN: https://${APP_HOST:?Run scripts/Init-Lan.ps1 first}
       TOTP_ENCRYPTION_KEY: ${TOTP_ENCRYPTION_KEY:?Run scripts/Init-Lan.ps1 first}
+      WEBAUTHN_ENABLED: ${WEBAUTHN_ENABLED:-false}
+      WEBAUTHN_RP_ID: ${WEBAUTHN_RP_ID:-}
+      WEBAUTHN_TRUSTED_ROOTS_FILE: ${WEBAUTHN_TRUSTED_ROOTS_FILE:-/config/webauthn-roots.json}
+      WEBAUTHN_AAGUID_ALLOWLIST: ${WEBAUTHN_AAGUID_ALLOWLIST:-}
+      MODE_C_ENABLED: ${MODE_C_ENABLED:-false}
+      MODE_C_HARDWARE_VERIFIED: ${MODE_C_HARDWARE_VERIFIED:-false}
+      ATTESTATION_SERVICE_URL: ${ATTESTATION_SERVICE_URL:-http://attestation:8081}
+      ATTESTATION_SERVICE_TOKEN: ${ATTESTATION_SERVICE_TOKEN:-}
+    volumes:
+      - ./infra/data:/config:ro
     command: [sh, -c, 'pnpm db:deploy && node dist/api/main.js']
     depends_on:
       db:
@@ -48,6 +58,16 @@ services:
     depends_on:
       api:
         condition: service_healthy
+    restart: unless-stopped
+  attestation:
+    profiles: [mode-c]
+    build:
+      context: ./infra/attestation
+    environment:
+      ATTESTATION_SERVICE_TOKEN: ${ATTESTATION_SERVICE_TOKEN:-}
+      ATTESTATION_PACKAGE_NAME: ${ATTESTATION_PACKAGE_NAME:-sk.biotoken.android}
+      ATTESTATION_SIGNING_CERT_SHA256: ${ATTESTATION_SIGNING_CERT_SHA256:-}
+      ATTESTATION_MIN_APP_VERSION: ${ATTESTATION_MIN_APP_VERSION:-1}
     restart: unless-stopped
 volumes:
   postgres_data:

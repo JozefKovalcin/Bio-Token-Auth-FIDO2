@@ -1,6 +1,6 @@
 # Prihlasovací tok
 
-V súčasnosti je implementovaný režim A. Režimy B a C v tejto kapitole opisujú cieľové správanie, nie dostupné funkcie aplikácie.
+A/B/C majú implementované softvérové toky. B/C sú dostupné iba po serverovej konfigurácii dôvery; fyzické akceptačné overenie zatiaľ nie je potvrdené. Konkrétne nastavenie a hranice uvádza modes-b-c.md.
 
 ## A: heslo a TOTP
 
@@ -8,7 +8,7 @@ Registrácia vytvorí účet a prihlásenú reláciu. Používateľ môže aktiv
 
 ## B: heslo a YubiKey
 
-Navrhovaný tok overí používateľské meno a heslo, potom vyžiada podpis WebAuthn od zaregistrovaného kľúča YubiKey. Prihlasovacie údaje pre režim B nemajú byť objaviteľné. Ak nasadenie vyžaduje konkrétny model kľúča, samotný USB hint nestačí; server musí uplatniť príslušnú politiku atestácie.
+Tok overí používateľské meno a heslo, potom vyžiada podpis WebAuthn od zaregistrovaného kľúča YubiKey. Prihlasovacie údaje pre režim B nemajú byť objaviteľné. Ak nasadenie vyžaduje konkrétny model kľúča, samotný USB hint nestačí; server musí uplatniť príslušnú politiku atestácie.
 
 ## C: YubiKey a Android
 

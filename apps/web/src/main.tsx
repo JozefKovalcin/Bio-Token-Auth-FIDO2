@@ -1,9 +1,12 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Eye, EyeOff, Vault } from 'lucide-react';
 import './style.css';
+import { request, type Capabilities, type Mode, type UserSession } from './auth-api';
 
-type User = { username: string; mode: string; totpActive: boolean; expiresAt: string };
+const AdvancedLogin = lazy(() => import('./AdvancedLogin').then(module => ({ default: module.AdvancedLogin })));
+const SecurityPanel = lazy(() => import('./SecurityPanel').then(module => ({ default: module.SecurityPanel })));
+type User = UserSession;
 type Enrollment = { secret: string; qr: string };
 type View = 'loading' | 'login' | 'register' | 'totp' | 'dashboard' | 'setup';
 const heroLines = ['Dva kroky.', 'Jedno bezpečné', 'prihlásenie.'];
@@ -24,6 +27,8 @@ async function api<T>(path: string, data?: object): Promise<T> {
 
 function App() {
   const [view, setView] = useState<View>('loading');
+  const [mode, setMode] = useState<Mode>('A');
+  const [capabilities, setCapabilities] = useState<Capabilities | null>(null);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
@@ -38,6 +43,17 @@ function App() {
   const [heroCharacters, setHeroCharacters] = useState(0);
   const title = useRef<HTMLHeadingElement>(null);
   const initialViewResolved = useRef(false);
+  const handleLogin = useCallback((value: UserSession) => {
+    setUser(value); setExpiresAt(Date.parse(value.expiresAt)); setMode(value.mode); setView('dashboard'); setError('');
+  }, []);
+  const refreshSession = useCallback(() => {
+    void api<User>('me').then(handleLogin).catch(() => { setUser(null); setView('login'); setMode('A'); });
+  }, [handleLogin]);
+  useEffect(() => {
+    const controller = new AbortController();
+    void request<Capabilities>('auth/capabilities', undefined, controller.signal).then(setCapabilities).catch(() => {});
+    return () => controller.abort();
+  }, []);
 
   useEffect(() => {
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -84,12 +100,12 @@ function App() {
   useEffect(() => {
     let alive = true;
     api<User>('me').then(value => {
-      if (alive) { setUser(value); setExpiresAt(Date.parse(value.expiresAt)); setView('dashboard'); }
+      if (alive) handleLogin(value);
     }).catch(e => {
       if (alive) { if (!(e instanceof ApiError && e.status === 401)) setError(e.message); setView('login'); }
     });
     return () => { alive = false; };
-  }, []);
+  }, [handleLogin]);
   useEffect(() => {
     if (view === 'loading') return;
     if (!initialViewResolved.current) { initialViewResolved.current = true; return; }
@@ -161,7 +177,7 @@ function App() {
   const firstCurrent = !second && view !== 'dashboard';
   const firstComplete = second || view === 'dashboard';
   const secondCurrent = second;
-  const secondComplete = view === 'dashboard' && Boolean(user?.totpActive);
+  const secondComplete = view === 'dashboard' && Boolean(user && (user.mode !== 'A' || user.totpActive));
   return <><a className="skip" href="#auth-title">Prejsť na formulár</a><div className="shell">
     <aside className="visual">
       <a className="brand" href="/" aria-label="Bio Token Auth – domov"><span className="brand-mark" aria-hidden="true"><Vault size={36} strokeWidth={1.6}/></span><span className="brand-type"><span>Bio Token</span><small>Auth</small></span></a>
@@ -180,19 +196,22 @@ function App() {
       </div>
     </aside>
     <div className="workspace">
-      <header className="topbar"><span className="mode-tag"><strong>Režim A</strong><span>Heslo + TOTP</span></span></header>
+      <header className="topbar"><span className="mode-tag"><strong>Režim {mode}</strong><span>{mode === 'A' ? 'Heslo + TOTP' : mode === 'B' ? 'Heslo + YubiKey' : 'YubiKey + telefón'}</span></span></header>
       <main className="main">
         <div className="form-wrap">
           <ol className="progress" aria-label="Priebeh overenia">
-            <li id="factor-one" className={firstCurrent ? 'current' : firstComplete ? 'complete' : ''} aria-current={firstCurrent ? 'step' : undefined}><span className="step-number">01</span><span>Heslo</span></li>
-            <li id="factor-two" className={secondCurrent ? 'current' : secondComplete ? 'complete' : ''} aria-current={secondCurrent ? 'step' : undefined}><span className="step-number">02</span><span>Autentifikátor</span></li>
+            <li id="factor-one" className={firstCurrent ? 'current' : firstComplete ? 'complete' : ''} aria-current={firstCurrent ? 'step' : undefined}><span className="step-number">01</span><span>{mode === 'C' ? 'YubiKey' : 'Heslo'}</span></li>
+            <li id="factor-two" className={secondCurrent ? 'current' : secondComplete ? 'complete' : ''} aria-current={secondCurrent ? 'step' : undefined}><span className="step-number">02</span><span>{mode === 'A' ? 'Autentifikátor' : mode === 'B' ? 'YubiKey' : 'Telefón'}</span></li>
           </ol>
           <section className="panel" aria-busy={busy} aria-labelledby="auth-title">
         <h2 id="auth-title" ref={title} tabIndex={-1}>{view === 'loading' ? 'Načítavam účet…' : heading}</h2>
-        <p className="hint">{view === 'register' ? 'Zvoľte si používateľské meno a heslo. Autentifikátor môžete pridať teraz alebo neskôr v účte.' : view === 'totp' ? 'Otvorte 2FAS, Google Authenticator alebo inú TOTP aplikáciu a zadajte aktuálny šesťmiestny kód.' : view === 'setup' ? 'Naskenujte QR kód v autentifikačnej aplikácii a potvrďte prvý kód.' : view === 'dashboard' ? 'Vyberte si, ako chcete chrániť svoj účet.' : 'Zadajte svoje meno a heslo.'}</p>
+        <p className="hint">{view === 'register' ? 'Zvoľte si používateľské meno a heslo. Autentifikátor môžete pridať teraz alebo neskôr v účte.' : view === 'totp' ? 'Otvorte 2FAS, Google Authenticator alebo inú TOTP aplikáciu a zadajte aktuálny šesťmiestny kód.' : view === 'setup' ? 'Naskenujte QR kód v autentifikačnej aplikácii a potvrďte prvý kód.' : view === 'dashboard' ? 'Vyberte si, ako chcete chrániť svoj účet.' : mode === 'A' ? 'Zadajte svoje meno a heslo.' : 'Dokončite všetky kroky zvoleného režimu.'}</p>
+
+        {view === 'login' ? <div className="mode-selector" role="group" aria-label="Prihlasovací režim">{(['A', 'B', 'C'] as Mode[]).map(value => <button className="secondary-button" key={value} type="button" aria-pressed={mode === value} disabled={busy || (value !== 'A' && !capabilities?.modes.includes(value))} onClick={() => { setMode(value); setPassword(''); setError(''); }}>Režim {value}</button>)}</div> : null}
+        {view === 'login' && mode !== 'A' ? <Suspense fallback={<p role="status">Načítavam overenie…</p>}><AdvancedLogin key={mode} mode={mode} onLogin={handleLogin}/></Suspense> : null}
 
         {view === 'loading' ? <p className="loading-status" role="status"><span className="busy-indicator" aria-hidden="true"/>Overujem prihlásenie…</p> : null}
-        {view === 'login' || view === 'register' || view === 'totp' ? <form onSubmit={submit}>
+        {(view === 'login' && mode === 'A') || view === 'register' || view === 'totp' ? <form onSubmit={submit}>
           {view !== 'totp' ? <>
             <label htmlFor="username">Používateľské meno</label>
             <input id="username" name="username" autoComplete="username" autoCapitalize="none" spellCheck={false} value={username} onChange={e => setUsername(e.target.value.toLowerCase())} required minLength={3} maxLength={64} pattern="[a-z0-9][a-z0-9._\-]{2,63}" placeholder="napr. student" disabled={busy}/>
@@ -219,10 +238,13 @@ function App() {
         </form> : null}
 
         {view === 'dashboard' ? <>
+          {user?.mode !== 'A' ? <p role="status">Prihlásenie režimom {user?.mode}: {user?.mode === 'B' ? 'heslo a YubiKey boli overené.' : 'YubiKey a spárovaný telefón boli overené.'}</p> : null}
+          <p><strong>TOTP pre režim A</strong></p>
           <div className="account-card"><span className="account-icon" aria-hidden="true">{user?.totpActive ? '✓' : '01'}</span><div><strong>{user?.totpActive ? 'Dvojité overenie je zapnuté' : 'Heslo chráni váš účet'}</strong><p>{user?.totpActive ? 'Pri ďalšom prihlásení zadajte aj kód z autentifikátora.' : 'Pridajte TOTP pre silnejšiu ochranu. Môžete to spraviť teraz alebo neskôr.'}</p></div></div>
           {user?.totpActive ? <div className="factor-status"><span className="status-dot"/> AUTENTIFIKÁTOR AKTÍVNY</div> : <button onClick={startSetup} disabled={busy}>{busy ? 'Pripravujem…' : 'Nastaviť TOTP teraz'}<span aria-hidden="true">→</span></button>}
           {error ? <p className="error" role="alert">{error}</p> : null}
           <button className="text-button" type="button" onClick={logout} disabled={busy}>Odhlásiť sa</button>
+          {user ? <Suspense fallback={<p role="status">Načítavam zabezpečenie…</p>}><SecurityPanel user={user} onSessionChanged={refreshSession}/></Suspense> : null}
         </> : null}
 
         {view === 'setup' ? <form onSubmit={activateTotp}>

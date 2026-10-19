@@ -18,3 +18,7 @@ local.properties
 infra/data/
 .DS_Store
 Thumbs.db
+.codex-tmp/
+.tooling/
+playwright-report/
+test-results/
