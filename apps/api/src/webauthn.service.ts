@@ -11,6 +11,7 @@ import { AuthService, passwordOptions } from './auth.service.js';
 import { SessionPolicyService, invalid, type Tx, type Mode } from './session-policy.service.js';
 import { WebAuthnAdapter, type RegistrationResponseJSON, type AuthenticationResponseJSON } from './webauthn-adapter.js';
 import { audit } from './audit.js';
+import { reportRegistrationFailure, type RegistrationFailureCode } from './webauthn-diagnostics.js';
 
 const ttl = 120_000;
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -40,6 +41,8 @@ export class WebAuthnService {
         if (!cert.ca || Date.parse(cert.validTo) <= Date.now()) throw new Error('Invalid WebAuthn trust root');
       }
       SettingsService.setRootCertificates({ identifier: 'packed', certificates: roots });
+      const intermediatesFile = process.env.WEBAUTHN_INTERMEDIATES_FILE;
+      if (intermediatesFile) this.adapter.configureRegistrationIntermediates(JSON.parse(readFileSync(intermediatesFile, 'utf8')), roots);
     }
   }
   capabilities() { return { modes: ['A', ...(this.enabled ? ['B'] : []), ...(this.enabled && this.cEnabled ? ['C'] : [])],
@@ -99,11 +102,14 @@ export class WebAuthnService {
     const info = await this.adapter.registration({ response, expectedChallenge: ceremony.challenge,
       expectedOrigin: this.origin, expectedRPID: this.rpId, expectedType: 'webauthn.create',
       requireUserPresence: true, requireUserVerification: true, supportedAlgorithmIDs: [-7, -257] });
-    if (!this.aaguids.has(info.aaguid.toLowerCase())) throw invalid();
+    if (!this.aaguids.has(info.aaguid.toLowerCase())) { reportRegistrationFailure('aaguid_not_allowed'); throw invalid(); }
     const credentialId = randomUUID();
+    let finalizationFailure: RegistrationFailureCode = 'finalization_rejected';
     await this.db.$transaction(async tx => {
       const user = await this.policy.lockUser(tx, ceremony.userId!);
+      finalizationFailure = 'session_not_fresh';
       await this.policy.fresh(raw, tx);
+      finalizationFailure = 'finalization_rejected';
       if (user.securityVersion !== ceremony.securityVersion) throw invalid();
       if (await tx.webAuthnCredential.count({ where: { userId: user.id, state: { not: 'REVOKED' } } }) >= 10) throw invalid();
       await tx.webAuthnCredential.create({ data: { id: credentialId, credentialId: info.credential.id,
@@ -113,7 +119,11 @@ export class WebAuthnService {
         backedUp: info.credentialBackedUp, deviceType: info.credentialDeviceType, attestationVerified: true } });
       await this.consume(tx, ceremony, 'CONSUMED', { credentialId });
       await audit(tx, user.id, 'credential.registered', { credentialId, profile: ceremony.mode });
-    }).catch(error => { if (error?.code === 'P2002') throw new ConflictException('Kľúč už bol zaregistrovaný.'); throw error; });
+    }).catch(error => {
+      reportRegistrationFailure(finalizationFailure);
+      if (error?.code === 'P2002') throw new ConflictException('Kľúč už bol zaregistrovaný.');
+      throw error;
+    });
     return { credentialId, state: 'CANDIDATE' };
   }
   async proofOptions(raw: string | undefined, purpose: 'ACTIVATE' | 'PAIRING', credentialId?: string) {

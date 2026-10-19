@@ -107,6 +107,20 @@ Pre vývoj s vlastnou testovacou databázou: Node 24+, pnpm 11.25.0, `pnpm insta
 
 ## 6. Zastavenie a hranice
 
+### Windows 11 / WSL mirrored: cielená príprava akceptácie
+
+Ak je lokálny DNS resolver už pripravený na `127.0.0.1:53` a LAN rozhraní, môže správca použiť `scripts/Enable-LanAcceptance.ps1`. Skript nesťahuje ani nespúšťa DNS server. Vyžaduje vlastnú LAN IPv4 adresu, explicitnú klientsku podsieť, verejný CA certifikát a jeho vopred overený SHA256 súboru. Najprv skontrolujte plán cez `-WhatIf`, potom rovnaký príkaz spustite v PowerShelli ako správca bez tohto prepínača. Príkladové hodnoty nahraďte skutočnými:
+
+```powershell
+./scripts/Enable-LanAcceptance.ps1 -ServerAddress 192.168.1.50 -ClientSubnet 192.168.1.0/24 -AppHost auth.bio-token.test -RootCertificate infra/data/bio-token-root.crt -ExpectedCaSha256 VLASTNY_64_ZNAKOVY_SHA256 -WhatIf
+```
+
+Skript pridá iba TCP 443 a TCP/UDP 53, obmedzené na uvedenú lokálnu adresu a klientsku podsieť, vo Windows aj dostupnom Hyper-V firewalle. Nemení predvolenú firewall politiku ani sieťový profil. Pre presný hostname pridá NRPT pravidlo na loopback DNS a do CurrentUser Root importuje overenú verejnú CA; nesúlad hash, neplatná CA alebo kolízia existujúcich pomenovaných pravidiel skončia chybou. Existujúce pravidlá neprepisuje. Pri runtime chybe skontrolujte už vytvorené pravidlá pred opakovaním.
+
+V mirrored režime môže Windows dosiahnuť WSL službu cez loopback, kým prístup cez vlastnú LAN IP nefunguje. Lokálny DNS preto môže na loopback rozhraní vrátiť `127.0.0.1` a na LAN rozhraní serverovú LAN IP. Kanonický HTTPS hostname a WebAuthn RP ID zostávajú rovnaké. Telefón musí používať LAN DNS a dôverovať verejnej CA samostatne; NRPT na PC mu DNS nenastaví. Skutočný prístup z telefónu overte priamo, bez zmeny TLS validácie. Pozri [Microsoft WSL networking](https://learn.microsoft.com/en-us/windows/wsl/networking) a [CoreDNS bind](https://coredns.io/plugins/bind/).
+
+Na Androide nastavte DNS danej Wi-Fi na LAN resolver; ak rozhranie vyžaduje statické IP nastavenie, zachovajte aktuálnu IP, bránu a dĺžku prefixu. Pevne zvolený poskytovateľ v **Súkromný DNS** môže obísť lokálny resolver a názov `.test` nepreložiť; počas tejto LAN akceptácie použite režim **Automatický**. Verejný `bio-token-root.crt` importujte ako **certifikát CA**, po porovnaní verejného odtlačku so serverom. Potom otvorte celú kanonickú adresu `https://auth.bio-token.test` a overte, že nezostalo TLS upozornenie. Import CA ani úspešný TCP connect samostatne nie sú dôkazom funkčného HTTPS. Debug APK musí používať rovnaký origin a jeho hostname-specific trust profil podľa [Android README](../apps/android/README.md).
+
 `docker compose down` zastaví aplikáciu a zachová databázu aj CA vo volumes. Použitie `down -v` tieto údaje zmaže. Po zmene IP upravte APP_HOST v `.env` a znovu vytvorte kontajnery; používajte novú URL. Nevymazávajte pritom TOTP_ENCRYPTION_KEY ani volume Caddy.
 
 Režimy B/C majú softvérovú implementáciu, ale predvolene sú vypnuté do konfigurácie dôvery a hardvérového overenia. Postup pre DNS, YubiKey a Android je v modes-b-c.md. Server povoľuje A iba účtom s `allowedModes` obsahujúcim `A`; klient túto politiku nezmení. Správa faktorov a klasifikovaný audit sú implementované; samoobslužná obnova nie je dostupná. Toto je LAN výskumný prototyp, nie hotové verejné nasadenie.

@@ -1,5 +1,22 @@
 # Pokračovanie na druhom zariadení
 
+## Uložený stav po fyzickom B — 19. október 2026
+
+Práca bola na žiadosť používateľa odložená a odoslaná do Gitu. Táto časť opisuje najnovší stav; pôvodný odovzdávací návod nižšie zachytáva východiskový stav pred týmto overením. Presné výsledky a hranice sú v [docs/verification.md](verification.md).
+
+- Na novom Windows PC vznikla nová izolovaná LAN inštancia. **B fyzicky PASS:** Yubico Security Key C NFC 5.8.0, registračná atestácia, potvrdenie kandidáta a prihlásenie heslom + YubiKey cez UP/UV. Nesprávne heslo a kombinovaný chýbajúci token/zrušenie boli odmietnuté; následne 0 platných sessions. Nesprávny PIN, fyzický replay/expirácia/súbeh sa nevykonali.
+- Opravené skutočné zlyhanie neúplnej Yubico certifikačnej cesty: voliteľný `WEBAUTHN_INTERMEDIATES_FILE` dopĺňa overených issuerov zo samostatného serverového poolu, bez rozšírenia root trustu alebo zmeny podpísaného payloadu. Plná knižničná validácia zostáva povinná. API kontrola a 53/53 izolovaných serverových testov prešli; bezpečnostné review PASS.
+- Telefón Xiaomi 2406APNFAG, Android 16/API 36, má skutočne nainštalovaný `sk.biotoken.android.debug`. Hash jeho nainštalovaného APK bol porovnaný so zostavou, signer je zaznamenaný vo verification. Predchádzajúce hlásenia o chýbajúcej aplikácii sú už vyriešené; neopakovať túto diagnostickú slučku.
+- Telefón prekladá `auth.bio-token.test` na `192.168.68.108`. Vyžadoval Wi-Fi DNS na tento LAN server a prepnutie pevného poskytovateľa Súkromného DNS na Automatický. Používateľ oznámil import verejnej CA, ale posledné HTTPS hlásenie bolo nepresné („nemám HTTPS“). **Dôvera HTTPS telefónu ešte nie je PASS:** pri pokračovaní získať presný chybový text/kód na plnej adrese `https://auth.bio-token.test/`; neobchádzať TLS.
+- **C zostáva vypnuté**, oba flagy `false`; C credential, mobilná atestácia/párovanie, odtlačok aj celý C tok sa ešte nevykonali. Interný verifier bol pripravený pre identitu skutočného debug APK; health 200 nepreukazuje CRL ani úspešnú atestáciu, port nebol publikovaný.
+- Existujúce device testy nepreukazujú úspešný odtlačok. Nový oddelený opt-in `OfflineBiometricPromptTest`/`OfflineBiometricRunner` je iba v test APK, bez siete, účtu, session alebo zmeny C gate. Používa dočasné kľúče, skutočný CryptoObject a lokálne overenie podpisu, potom samostatný cancel. Build, Spotless, lint (0 chýb/40 upozornení), signer aj výsledný manifest prešli; bezpečnostné review PASS. **Fyzicky sa nespustil.** Postup je v [Android README](../apps/android/README.md). Test APK je už prenesený do telefónu ako `Download/bio-token-device-test.apk`, zatiaľ nenainštalovaný; testovací balík nemá slúžiť ako druhá bežná aplikácia.
+
+Pri zatvorení sa zastavujú iba projektové Compose služby, vlastný lokálny CoreDNS, projektový ADB a Gradle daemony; volumes, `.env`, verejné trust podklady, CA, SDK a APK sa nemažú. Tieto lokálne súbory sú ignorované a **nie sú zálohované Gitom**. Na tom istom PC nespúšťať `Init-Lan.ps1` cez existujúcu konfiguráciu, nevytvárať ďalšiu DB/CA ani neodinštalovať aplikáciu. Používateľ bol vyzvaný vrátiť Wi-Fi IP/DNS telefónu na DHCP, pretože lokálny DNS sa zastaví; vykonanie tohto kroku nebolo automaticky potvrdené.
+
+Pokračovanie na rovnakom PC: najprv načítať pravidlá/skilly, skontrolovať aktuálnu LAN IP a zachované lokálne nastavenia, obnoviť vlastný DNS pomocou existujúceho ignorovaného `.tooling/start-local-dns.ps1` a projektové služby cez `docker compose --profile mode-c up -d --wait`. Tento Compose profil spúšťa interný verifier, sám nezapína C. Pri zmene LAN IP najprv upraviť lokálny DNS/firewall podľa návodu. Obnoviť DNS telefónu pre test, vyriešiť presnú HTTPS chybu, vedome nainštalovať test APK a vykonať oba kroky lokálneho biometrického testu; až po splnení základnej brány postupovať na izolované C párovanie. Na inom PC sú potrebné nové vedomé prevádzkové rozhodnutia; lokálne tajomstvá sa cez chat ani Git neprenášajú.
+
+## Pôvodný východiskový návod
+
 Odovzdanie z 19. októbra 2026. Tento dokument poskytuje kontext aj bez pôvodného chatu. Implementácia B/C je na `main` v commite `000b510f05b9ae14b739eb9e3e0adb880655166c`; tento návod bol pridaný následne. Pracujte s najnovším `main`, nie s pôvodným základom projektu.
 
 ## Cieľ a rozhodnutia používateľa

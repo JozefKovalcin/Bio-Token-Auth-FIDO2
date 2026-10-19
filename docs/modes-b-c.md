@@ -11,7 +11,7 @@ Existujúci `.env` neprepisujte generátorom. Upravte adresu a nové nastavenia 
 ## Aktivácia WebAuthn a režimu B
 
 1. Z dôveryhodných oficiálnych Yubico/FIDO metadát získajte schválené verejné root certifikáty pre podporovaný model. Neimportujte koreň dodaný používateľom počas registrácie. Overte pôvod a platnosť certifikátov.
-2. Uložte JSON pole PEM certifikátov do lokálneho ignorovaného `infra/data/webauthn-roots.json`. Compose ho sprístupní API read-only na `/config/webauthn-roots.json`.
+2. Uložte JSON pole PEM certifikátov do lokálneho ignorovaného `infra/data/webauthn-roots.json`. Compose ho sprístupní API read-only na `/config/webauthn-roots.json`. Ak model dodáva iba leaf certifikát, z dôveryhodných oficiálnych metadát získajte aj jeho verejné medziľahlé CA a uložte ich oddelene do `infra/data/webauthn-intermediates.json`; nastavte voliteľné `WEBAUTHN_INTERMEDIATES_FILE=/config/webauthn-intermediates.json`. Tieto certifikáty tvoria iba pomocný issuer pool, nie nové trust anchors. Do root súboru ich nepridávajte. Bez nakonfigurovaného poolu zostáva overenie pri neúplnom reťazci bezpečne odmietnuté.
 3. Do `WEBAUTHN_AAGUID_ALLOWLIST` vložte overené AAGUID podporovaných modelov oddelené čiarkou. Samotný AAGUID bez validovanej atestácie nestačí.
 4. Nastavte `WEBAUTHN_ENABLED=true` a reštartujte zostavu. Chybné alebo chýbajúce trust nastavenie spôsobí bezpečné zlyhanie spustenia WebAuthn.
 5. Prihláste účet podľa aktuálnej politiky. V správe zabezpečenia vykonajte čerstvé overenie, registráciu YubiKey pre B a následné potvrdenie kandidátskeho kľúča.

@@ -63,3 +63,27 @@ Po chybe počas odosielania aplikácia nevyhlasuje úspech a automaticky nevydá
 Zaznamenajte model/Android, security level, podpisový certifikát APK a podporovaný YubiKey/firmware/browser. Overte pairing + PC potvrdenie, iba odtlačok na vybranom telefóne, zamietnutie/cancel/lockout bez PIN fallbacku, nový biometrický zápis, odvolanie, chybnú CA/hostname, rotáciu/process death, sieťový výpadok, expiráciu a celý C tok so session iba na PC. `BIOMETRIC_STRONG` všeobecne neznamená výhradne odtlačok.
 
 Automatické JVM testy používajú fake platformové hranice; device testy sú oddelené v `src/androidTest`. Výsledky konkrétneho behu patria do projektového záznamu overenia, nie do tvrdení o univerzálnej podpore hardvéru.
+
+## Interaktívny lokálny CryptoObject test pred zapnutím C
+
+`OfflineBiometricPromptTest` preveruje skutočné `DeviceKeys` bez servera, siete, QR, párovania alebo session. Je iba v test APK a používa vlastný `OfflineBiometricRunner` s obyčajným `Application`; nespúšťa produkčný `BioTokenApplication`, jeho čítanie `DeviceStore` ani upratovanie ostatných aliasov. Hostom je existujúca prázdna debug `ComponentActivity`, nie `MainActivity`. Test nemení produkčné API, UI, podpis aplikácie ani brány C.
+
+Bežný `connectedDebugAndroidTest` a CI tento test preskočia: vyžaduje súčasne samostatný runner a výslovný argument `interactiveBiometric=true`. Zostavenie test APK nevyžaduje telefón a nespúšťa prompt:
+
+```powershell
+./gradlew.bat spotlessCheck :app:lintDebug :app:assembleDebugAndroidTest -PbioServiceOrigin=https://auth.bio-token.test
+```
+
+Interaktívny beh sa smie spustiť až po fyzickom overení B, na vyhradenom telefóne so zapísaným silným odtlačkom a po vedomej inštalácii kompatibilného debug APK aj `app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk`. Neprepisujte odlišne podpísanú spárovanú aplikáciu a neodinštalujte ju kvôli testu. Samotný beh neinštaluje APK:
+
+```powershell
+adb shell am instrument -w -r -e interactiveBiometric true sk.biotoken.android.debug.test/sk.biotoken.android.OfflineBiometricRunner
+```
+
+Na telefóne sú dva samostatné výslovné kroky. Najprv stlačte **Spustiť test odtlačku** a potvrďte systémový prompt skutočným zapísaným odtlačkom. Potom stlačte **Spustiť test zrušenia** a v systémovom prompte zvoľte **Zrušiť**; v druhom kroku nepoužívajte odtlačok. Každý krok čaká najviac 180 sekúnd. Opakované chybné odtlačky ani lockout sa nevyvolávajú. Odchod z aktivity, chyba alebo neplánovaný súhlas v druhom kroku test ukončia neúspešne.
+
+Test vytvorí iba dve nové dočasné `bio-test-UUID` dvojice cez skutočné `DeviceKeys`, s náhodnou lokálnou atestačnou výzvou. Preverí lokálne hlásenú hardvérovú ochranu a per-use silnú biometrickú politiku. Pred súhlasom požaduje rozpoznateľné odmietnutie neoprávneného podpisu. Platformový `BiometricPrompt` povoľuje iba `BIOMETRIC_STRONG` a používa `CryptoObject(Signature)`, bez PIN/device credential fallbacku. Podpíše náhodný payload s jednoznačným lokálnym testovým prefixom, výsledok overí verejným kľúčom toho istého aliasu a preverí, že ďalšia čerstvá operácia znovu vyžaduje biometriu. Zrušený krok nikdy nevytvára podpis ani JWS; po zrušení musí nová neoprávnená operácia opäť zlyhať.
+
+Vlastný výstup obsahuje iba pevné `PASS`/`FAIL_*` výsledky vrátane `PASS_SIGNATURE_VERIFIED`, `PASS_PER_USE` a `PASS_CANCELLED_NO_SIGNATURE`; žiadne payloady, aliasy, podpisy ani certifikáty sa nevypisujú. Pri bežnom ukončení aj výnimke sa vo `finally` mažú výhradne oba vlastné UUID aliasy. Násilné ukončenie procesu alebo vypnutie telefónu nemusí umožniť vykonanie `finally`; test nikdy plošne nevyhľadáva ani nemaže ostatné kľúče. Neznáme platformové chyby neoprávneného podpisu sa nepovažujú za úspešné odmietnutie (`FAIL_AUTH_DENIAL_UNCLASSIFIED`).
+
+Tento výsledok je iba **lokálny hardvérový/CryptoObject test**. Nepotvrdzuje AndroidX/MainActivity lifecycle a callback integráciu, serverovú atestáciu, revokácie, párovanie ani celý C tok. `BIOMETRIC_STRONG` samo osebe nepreukazuje výhradne odtlačok; jeho skutočné použitie na overenom snímači musí potvrdiť pozorovaný fyzický krok. Výsledky ani preskočenie testu automaticky nemenia serverové nastavenia C.

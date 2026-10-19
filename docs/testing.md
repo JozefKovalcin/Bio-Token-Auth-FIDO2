@@ -10,6 +10,8 @@ Testy A pokrývajú registráciu/TOTP, limity, replay, expiráciu, cookies a sú
 
 C testy overujú JWS bajty, oddelenie účelov/kľúčov, kandidátske párovanie, kontrolu pôvodného PC, dva faktory, replay, expiráciu, revokáciu, zmenu trust stavu a súbežné rozhodnutie/dokončenie. Ich atestačný fixture provider existuje iba v testoch. HTTP testy overujú oddelenie native a browser rout, Origin, cookies a veľkosť/validitu JSON bez úniku obsahu.
 
+Regresné testy dopĺňania issuerov vytvárajú dočasnú testovaciu PKI a skutočne podpísanú packed atestáciu cez OpenSSL; lokálny `pnpm test` preto potrebuje aj CLI `openssl` v PATH (Compose test image ho obsahuje). Súkromné testovacie kľúče sa generujú iba v dočasnom priečinku a následne odstránia, nie sú súčasťou Gitu ani runtime konfigurácie. Overuje sa odmietnutie leaf-only reťazca bez poolu, úspech s explicitnými intermediates pod pôvodným rootom, nezmenené podpísané bajty a odmietnutie nesprávnych rootov/issuerov, podpisov, payloadu, UP/UV a chybných poolov. Ani tento kryptografický fixture nenahrádza fyzický YubiKey.
+
 `pnpm test:browser` používa Chromium a virtuálny WebAuthn autentifikátor. API je v týchto UI testoch nahradené testovou hranicou; testuje sa správanie formulárov, skutočné browserové vytvorenie assertion, odmietnutie fallbacku a stale-tab handling. Nejde o fyzický hardvérový test.
 
 ## Android

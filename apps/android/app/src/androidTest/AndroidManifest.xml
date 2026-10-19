@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- AGP applies the configured default runner to the first instrumentation element. -->
+    <instrumentation
+        android:name="androidx.test.runner.AndroidJUnitRunner"
+        android:targetPackage="sk.biotoken.android.debug" />
+    <instrumentation
+        android:name="sk.biotoken.android.OfflineBiometricRunner"
+        android:targetPackage="sk.biotoken.android.debug"
+        android:functionalTest="true"
+        android:handleProfiling="false" />
+</manifest>
