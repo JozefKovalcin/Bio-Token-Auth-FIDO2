@@ -52,10 +52,14 @@ function App() {
     void api<User>('me').then(handleLogin).catch(() => { setUser(null); setView('login'); setMode('A'); });
   }, [handleLogin]);
   useEffect(() => {
+    if (view !== 'login') return;
     const controller = new AbortController();
-    void request<Capabilities>('auth/capabilities', undefined, controller.signal).then(setCapabilities).catch(() => {});
+    setCapabilities(null);
+    void request<Capabilities>('auth/capabilities', undefined, controller.signal).then(value => {
+      if (!controller.signal.aborted) setCapabilities(value);
+    }).catch(() => {});
     return () => controller.abort();
-  }, []);
+  }, [view]);
 
   useEffect(() => {
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');

@@ -12,6 +12,40 @@ async function mockApi(page: Page, advanced = false) {
   });
 }
 
+test('logout refreshes server capabilities after C is enabled during the session without reloading', async ({ page }) => {
+  let modeCEnabled = false; let capabilityRequests = 0; let sessionRequests = 0; let navigations = 0;
+  page.on('framenavigated', frame => { if (frame === page.mainFrame()) navigations++; });
+  await page.route('**/api/**', async route => {
+    const path = new URL(route.request().url()).pathname;
+    if (path === '/api/auth/capabilities') {
+      capabilityRequests++;
+      return route.fulfill({ json: { modes: modeCEnabled ? ['A', 'B', 'C'] : ['A', 'B'], webauthnEnabled: true, modeCEnabled } });
+    }
+    if (path === '/api/auth/me') {
+      sessionRequests++;
+      return route.fulfill({ status: 401, json: { message: 'Neprihlásený používateľ.' } });
+    }
+    if (path === '/api/auth/password') return route.fulfill({ json: { step: 'done', user: { ...user, mode: 'A' } } });
+    if (path === '/api/auth/logout') return route.fulfill({ json: { loggedOut: true } });
+    return route.fulfill({ status: 400, json: { message: 'Test endpoint.' } });
+  });
+  await page.goto('/');
+  await expect(page.getByRole('button', { name: 'Režim B', exact: true })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Režim C', exact: true })).toBeDisabled();
+  await page.getByLabel('Používateľské meno').fill(user.username);
+  await page.getByLabel('Heslo', { exact: true }).fill('TEST-ONLY-password');
+  await page.getByRole('button', { name: 'Pokračovať', exact: true }).click();
+  await expect(page.getByRole('heading', { name: `Vitajte, ${user.username}.` })).toBeVisible();
+  modeCEnabled = true;
+  await page.getByRole('button', { name: 'Odhlásiť sa', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Režim C', exact: true })).toBeEnabled();
+  await page.getByRole('button', { name: 'Režim C', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Režim C', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  expect(capabilityRequests).toBe(2);
+  expect(sessionRequests).toBe(1);
+  expect(navigations).toBe(1);
+});
+
 test('unavailable modes remain disabled and A registration remains accessible', async ({ page }) => {
   await mockApi(page); await page.goto('/');
   await expect(page.getByRole('button', { name: 'Režim B', exact: true })).toBeDisabled();

@@ -29,6 +29,8 @@ Web používa fotografiu trezorových dverí `pexels-cottonbro-8466227.jpg`. QR 
 
 Pre školskú úlohu začnite [stručným postupom spustenia a skúšky A/B/C na notebooku](docs/demo-quickstart.md). Obsahuje príkazy pre existujúcu aj novú inštanciu, Android APK a poradie skúšok. Obnova účtov a produkčný hosting sú mimo rozsahu školského dema.
 
+Pre už pripravený notebook je k dispozícii [krátky postup spustenia a vypnutia so zachovaním účtov a párovania](docs/spustenie-vypnutie.md).
+
 Na počítači, ktorý bude serverom, otvorte PowerShell v hlavnom priečinku projektu. Zistite jeho IPv4 adresu príkazom `ipconfig` a nahraďte ňou príklad `192.168.1.50`:
 
 ```powershell

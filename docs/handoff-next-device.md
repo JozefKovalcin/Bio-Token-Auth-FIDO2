@@ -1,5 +1,15 @@
 # Pokračovanie na druhom zariadení
 
+## Fyzické C na notebooku — 2. november 2026
+
+Na zachovanej izolovanej inštancii prešiel skutočný lokálny odtlačok/CryptoObject podpis aj cancel, nová C registrácia/aktivácia YubiKey, hardvérová atestácia oboch mobilných kľúčov, PC potvrdenie párovania, C trial a následné prihlásenie C. Server potvrdil `webauthn + mobile`, oba dôkazy toho istého účtu a jednu session z dokončenej C transakcie. Detaily, časy a nevykonané negatívne scenáre sú vo [verification.md](verification.md). Ide o základný pozitívny fyzický tok, nie automatické potvrdenie všetkých bezpečnostných skúšok.
+
+Aktuálna LAN IP je `192.168.68.120/22`; lokálny DNS a úzko viazané Windows/Hyper-V pravidlá boli aktualizované bez rozšírenia portov alebo podsiete. Telefón má aktuálny debug APK s pôvodným signerom; jeho kontrola hlási REACHABLE. Používateľ povolil Inštalovať cez USB pre nasadenie test APK; na bežné C prihlásenie USB ladenie ani test APK netreba. A/B/C sú lokálne zapnuté a politika testovacieho účtu obsahuje A/B/C; vzorové konfigurácie v Gite sa tým nezapínajú. Aktuálny oficiálny FIDO MDS 294 bol podpisovo overený, nextUpdate 1.12.2026, bez compromise/revoked reportu pre model.
+
+Používateľ požiadal uložiť postup aj zmeny do Gitu. Praktické príkazy pre zachované prostredie sú v [spustenie-vypnutie.md](spustenie-vypnutie.md). `.env`, volumes, CA, privátny signing setup a lokálny DNS runtime zostávajú mimo Gitu. Pri pokračovaní ich zachovajte; negenerujte novú DB/CA ani neodinštalujte spárovanú aplikáciu.
+
+Po fyzickom C bola opravená aj zastaraná dostupnosť C v prihlasovacom menu po logout: capabilities sa znovu načítajú pri návrate na login s AbortController ochranou. Nová regresia pred opravou FAIL, po oprave všetkých 8 browserových testov PASS, TypeScript/build PASS; opravený web je nasadený. Backendové bezpečnostné brány sa nemenili. Projekt zostal používateľovi spustený, samotné uloženie návodu nevykonalo vypnutie.
+
 ## Rozsah školského dema a finálne doladenie webu — 2. november 2026
 
 Používateľ chce školskú úlohu A/B/C; obnova účtov a produkčný hosting sa teraz neimplementujú. Začnite [návodom pre notebook](demo-quickstart.md), ktorý má konkrétne príkazy a poradie skúšok. Web bol doladený vizuálne aj funkčne: režimové texty a kroky, registrácia z B/C, návraty/zrušenie, konzistentné karty/tlačidlá/checkboxy, kandidátske a politické akcie. Najnovšie browserové overenie je **7/7 PASS**, build a TypeScript PASS; fyzické C sa tým nenahrádza. Pri ďalšej práci nerozširujte školské zadanie o recovery alebo verejný cloud. Zachovajte oba skutočné faktory C a existujúce trust brány.

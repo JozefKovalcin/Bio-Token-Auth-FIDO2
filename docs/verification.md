@@ -1,5 +1,52 @@
 # Záznam overenia
 
+## 2. november 2026 — spustenie aktuálnej verzie na notebooku a príprava fyzického C
+
+Checkout `975612b` bol pri začiatku čistý. Existujúce `.env`, databáza, CA, trust súbory a Android signing setup sa zachovali. Docker Desktop bol vypnutý; po jeho spustení prešlo nové `docker compose up --build -d --wait`, vrátane API TypeScript/Vite buildu, všetky základné služby sú healthy. Žiadny nový účet, databáza ani CA sa negenerovali. Toto je nový štartovací beh, nie opakovanie historickej fyzickej akceptácie.
+
+Aktuálny HTTPS smoke PASS: plné overenie CA a hostname, health 200, neprihlásený `/api/auth/me` 401, logout bez Origin 403, web 200 a CSP `frame-ancestors 'none'`. Bežný Windows trust cez `Invoke-RestMethod` tiež PASS. Capabilities hlásia A/B, C false. HTTP redirect sa v tomto behu netestoval; historická kolízia cudzieho nginx na porte 80 sa nevydáva za opravenú.
+
+Notebook má teraz LAN IP `192.168.68.120/22`. Po úspešnom WhatIf a používateľskom UAC boli aktualizované iba lokálne adresy existujúcich troch Windows a troch Hyper-V projektových pravidiel z `.108` na `.120`; porty 443/53, protokoly a vzdialená podsieť `/22` zostali zachované. Lokálny CoreDNS znovu beží na loopback/LAN; priame DNS dotazy potvrdili `127.0.0.1` pre PC a `.120` pre LAN. Telefón Xiaomi je ADB autorizovaný; pevný Súkromný DNS najprv blokoval názov. Po používateľskom nastavení Wi-Fi DNS na `.120` a Súkromného DNS na Automatický používateľ potvrdil HTTPS stránku **bez TLS upozornenia**. Neobchádzala sa TLS validácia.
+
+Aktuálny Android build z rovnakého checkoutu PASS: **25/25 JVM testov** (core 15/app 10), 0 skipped/fail/errors, Spotless, main aj test APK, lint 0 chýb/40 upozornení. Oba `apksigner verify` PASS a zachovaný signer `c2b7995d1b4b0f763400bd56d82389156a76a3deeee7a828eeb1959b708475c7`; pôvodný nainštalovaný APK bol pred aktualizáciou read-only overený s týmto signerom. Nový main file SHA256 `f3b9430ba1ae52c4291807d0ff5d7e669ab759d9544baf471a4045406a97f8e2`, test file SHA256 `a87fb16222d17d954c2d29bc366c400518a97107e4a934226a3e5a03013d676d`. Origin aj binárny network-security-config zodpovedajú kanonickému hostname; oba test runnery majú správny debug target. Dočasný SUBST alias odstránený. Oba aktuálne APK prenesené do Download s overenými vzdialenými hashmi; aktualizácia/inštalácia a výsledok novej aplikačnej kontroly spojenia ešte čakajú na potvrdenie používateľa.
+
+Interný verifier bol zostavený a spustený s existujúcou verejnou identitou debug APK; JVM testovacia vrstva bola **z cache**, nepočíta sa ako nový testový beh. Interný health 200/status ok, neprihlásený verify 401, port 8081 bez publikovania. Toto nepreukazuje CRL ani úspešnú hardvérovú atestáciu. Oba C gate flagy zostávajú false, kým sa nedokončí základné fyzické overenie.
+
+Nezávislá aktuálna trust kontrola PASS: oficiálny FIDO MDS č. **294**, `nextUpdate=2026-12-01`, podpis RS256 a signing chain s online revokáciou overené. Modelový AAGUID a firmware 5.8.0 zostali certifikované bez compromise/revoked reportu; Root 1 a všetkých päť issuerov zodpovedajú podpísanému záznamu. Trust konfigurácia sa nerozširovala. Verejné dôkazy sú ignorované v `infra/data/yubico-reference/2026-11-02/`.
+
+Aktualizovaný main APK bol následne overený aj z nainštalovaného `base.apk`: hash presne zhodný s novou zostavou. Používateľ v novej aplikácii potvrdil **REACHABLE**, teda dôveryhodné HTTPS z konkrétneho Android klienta. Testovací balík po pôvodnom ručnom hlásení Android neevidoval. Overený test APK bol dočasne sprístupnený cez kanonické HTTPS `/test.apk` (200, správny MIME a SHA256); samotné stiahnutie nepreukázalo inštaláciu. Jeden štandardný `adb install -r -t` skončil `INSTALL_FAILED_USER_RESTRICTED`. Po používateľovom povolení samostatnej voľby „Inštalovať cez USB“ nový pokus prešiel `Success`; nainštalovaný test APK má presný očakávaný hash a vlastný offline runner je registrovaný. Aplikácie sa neodinštalovali, dáta sa nemazali a globálne OS ochrany sa nevypínali. Dočasný HTTPS súbor bol po overenej inštalácii odstránený; pôvodné lokálne APK zostávajú zachované.
+
+**Fyzický lokálny CryptoObject test PASS:** explicitný `OfflineBiometricRunner` s opt-in prebehol na pripojenom telefóne, bez servera alebo párovania. Sanitizovaný výsledok v poradí `PASS_SIGNATURE_VERIFIED`, `PASS_PER_USE`, `PASS_CANCELLED_NO_SIGNATURE`, záverečné `PASS`, runner code -1/ADB exit 0. Test lokálne preveril hardvérovú politiku per-use BIOMETRIC_STRONG, podpis overil verejným kľúčom a ďalšia operácia znova vyžadovala autentifikáciu; samostatné používateľské zrušenie podpis nevytvorilo. Presný druh použitej silnej biometrie ešte čaká na výslovné používateľovo potvrdenie odtlačku; test sám nerozlišuje všetky druhy BIOMETRIC_STRONG. Lockout sa nevyvolával. Produkčný AndroidX tok, serverová atestácia a C sa týmto lokálnym výsledkom nepotvrdzujú.
+
+Používateľ následne výslovne potvrdil, že lokálny podpis schválil **odtlačkom prsta**, a vykonal čerstvé fyzické prihlásenie cez B. Read-only serverové metadáta potvrdili session `B`, faktory `{password,webauthn}`, `authTime=2026-11-02T07:39:37.939Z`. Základná brána pre následné zapnutie C v izolovanej akceptačnej inštancii je tým splnená: skutočný podporovaný token/UP/UV, známa identita nainštalovaného APK, lokálna hardvérová per-use politika a reálny odtlačok/podpis/cancel. Toto stále nie je úspešné C párovanie alebo prihlásenie.
+
+V tejto fáze ešte čakalo párovanie, serverová atestácia a celý C tok; ich následné skutočné výsledky sú uvedené nižšie. Prevádzkové schválenie sa netvrdí.
+
+Po zdokumentovaní základnej fyzickej brány boli na používateľovu žiadosť v existujúcej **izolovanej** konfigurácii zapnuté `MODE_C_ENABLED=true` aj `MODE_C_HARDWARE_VERIFIED=true`. Ostatné konfiguračné bajty sa zachovali. Compose API bol znovu vytvorený bez buildu alebo mazania volumes, interný verifier ostal bez zverejneného portu. Následné kanonické HTTPS capabilities 200 potvrdili `[A,B,C]`, oba runtime flagy true. Ide o sprístupnenie pre akceptačný protokol, nie o dokončené fyzické C. Používateľ pokračuje samostatnou registráciou/potvrdením C credentialu; politika účtu sa priamo v DB nemení.
+
+**Fyzická registrácia a aktivácia samostatného C kľúča PASS:** po registrácii server evidoval `profile=C`, `state=CANDIDATE`, `attestationVerified=true`. Prvé potvrdenie nepostúpilo: už uplynulo päťminútové okno čerstvej session, server preto nevydal ACTIVATE výzvu. To bolo bezpečné odmietnutie, nie oslabenie validačnej brány. Po novom B prihlásení používateľ potvrdil existujúci kandidát; read-only metadáta potvrdili `C/ACTIVE`, overenú atestáciu a `proofAt=2026-11-02T07:47:27.928Z`. Ďalší kľúč sa kvôli expirácii nevytváral. Nasleduje skutočné párovanie/atestácia telefónu; QR a porovnávací kód sa nezískavajú do chatu ani logov.
+
+**Fyzické párovanie a mobilná atestácia PASS:** používateľ potvrdil párovanie na pôvodnom PC. Read-only serverové údaje: pairing `CONFIRMED`, telefón `ACTIVE/HARDWARE_ATTESTED`, oba kľúče `TRUSTED_ENVIRONMENT`, `verifiedBoot=true`, `applicationVerified=true`, `biometricPerUse=true`, `verifiedAt=2026-11-02T07:48:19.460847518Z`. Prešiel skutočný interný verifier aj podpisové dôkazy; health ani fixtures tento výsledok nenahrádzali.
+
+**Fyzický C trial a politika PASS:** transakcia `C_ACTIVATION/CONSUMED` má overený YubiKey aj mobil; používateľ cez UI uložil politiku A/B/C. Po odhlásení zostal prepínač C neklikateľný kvôli jednorazovo načítaným starým capabilities vo webovej aplikácii. API správne hlásilo A/B/C a účet ich mal povolené; Ctrl+F5 obnovilo aktuálnu ponuku. Následná úzka oprava obnovuje ponuku pri každom návrate na prihlásenie, čistí starý stav a ignoruje zrušené odpovede; úvodná kontrola session aj backendové brány zostali zachované.
+
+**Fyzický celý pozitívny C login PASS:** používateľ potvrdil funkčný tok a read-only serverové metadáta overili session `mode=C`, faktory `{webauthn,mobile}`, `authTime=2026-11-02T07:53:05.914Z`, zdrojovú transakciu `LOGIN/CONSUMED` s oboma faktorovými dôkazmi, zhodný účet credentialu aj mobilu a presne **1** session tejto transakcie. Webové dokončenie prebehlo na pôvodnom PC; tento výsledok nepotvrdzuje samostatnú fyzickú skúšku iného prehliadača ani súbehu.
+
+| Aktuálny fyzický scenár na notebooku | Výsledok |
+| --- | --- |
+| B login heslom + YubiKey | PASS |
+| Lokálny CryptoObject odtlačok/per-use/cancel | PASS |
+| Samostatný C credential a potvrdenie | PASS |
+| Atestácia oboch mobilných kľúčov, dôkaz držby a PC potvrdenie | PASS |
+| C trial pred politikou, následná politika A/B/C | PASS |
+| Prihlásenie C cez YubiKey + odtlačok na pôvodnom PC | PASS |
+| C zamietnutie/cancel celého toku, replay, expirácia, iný účet/transakcia, súbeh, revokácia | NEVYKONANÉ fyzicky v tomto behu |
+| C-only politika, zmena biometrického zápisu, reinštalácia/lockout | NEVYKONANÉ; účet zostáva A/B/C, lockout sa nevyvolával |
+
+Projekt zostáva izolovaným školským demom. Úspešný pozitívny C tok sa nevydáva za kompletnú bezpečnostnú akceptáciu alebo produkčnú certifikáciu. Postup opakovaného spustenia/vypnutia so zachovaním dát je v [spustenie-vypnutie.md](spustenie-vypnutie.md).
+
+Oprava ponuky má nový browserový regresný scenár: server najprv ponúka A/B, počas prihlásenej relácie zapne C a po logout sa C sprístupní bez reloadu. Test pred opravou preukázateľne zlyhal, po oprave prešiel. Aktuálne TypeScript, web build a **8/8 browserových testov PASS** (pôvodných 7 + regresia); sú to automatické scenáre s testovým API. Opravený Caddy image bol zostavený a nasadený samostatne bez reštartu API; bežné kanonické HTTPS 200 overilo nový web asset a capabilities A/B/C. Predchádzajúci fyzický C login sa po tejto čisto UI oprave neopakoval. PowerShell bloky uloženého návodu prešli syntaktickou kontrolou 4/4, whitespace PASS.
+
 ## 2. november 2026 — doladenie webu pre školské demo
 
 Používateľ spresnil rozsah: školská úloha A/B/C, bez požiadavky na obnovu účtov a produkčný hosting. Pridaný [návod pre notebook](demo-quickstart.md); nemení bezpečnostné požiadavky jednotlivých režimov.

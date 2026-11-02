@@ -1,6 +1,8 @@
 # Školské demo: spustenie a skúška A/B/C
 
-Rozsah je školská úloha: tri prihlasovacie režimy, ich rozhranie a overenie faktorov. Obnova účtov, verejný hosting a produkčný recovery portál nie sú podmienkou dokončenia dema. Firebase sa nepoužíva. Fyzický celý tok C sa ešte musí vyskúšať na notebooku s YubiKey a telefónom.
+Rozsah je školská úloha: tri prihlasovacie režimy, ich rozhranie a overenie faktorov. Obnova účtov, verejný hosting a produkčný recovery portál nie sú podmienkou dokončenia dema. Firebase sa nepoužíva. Základný fyzický C tok na notebooku prešiel 2. novembra 2026; nevykonané negatívne scenáre zostávajú oddelené vo [verification.md](verification.md).
+
+Pre zachovanú inštanciu na tomto notebooku použite krátky [postup spustenia a vypnutia](spustenie-vypnutie.md). Nasledujúce časti pokrývajú aj prípravu iného zariadenia.
 
 ## 1. Aktualizácia notebooku
 
