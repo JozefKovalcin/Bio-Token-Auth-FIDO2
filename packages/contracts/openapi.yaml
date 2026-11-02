@@ -2263,6 +2263,10 @@ paths:
       summary: >-
         Consume signed status challenge; allow owner to learn revocation state without leaking public account details. Native endpoint: reject browser cookies;
         Origin is not authentication.
+      description: >-
+        The current device state and one-time proof consumption are serialized with PC pairing confirmation and revocation.
+        A non-active candidate whose pairing expired, was cancelled, or no longer matches the account security version is retired as REVOKED.
+        This authorizes explicit removal of its local keys and a new controlled pairing. An ACTIVE device is never retired merely because its original pairing expired.
       security: []
       responses:
         '201':

@@ -212,3 +212,74 @@ test('changed certificate trust blocks both mobile approval and browser completi
     assert.equal(await db.session.count({ where: { sourceTransactionId: completedApproval.transaction.id } }), 0);
   } finally { fixtureAttestation.revoked = false; }
 });
+
+async function pendingPairing() {
+  const f = await fixture();
+  await db.user.update({ where: { id: f.user.id }, data: { allowedModes: ['A'] } });
+  const grant = await policy.issueGrant(f.sessionToken, 'ENROLL');
+  const proof = await db.authTransaction.create({ data: { tokenHash: digest(token()), userId: f.user.id, mode: 'C', purpose: 'PAIRING',
+    state: 'VERIFIED_YUBIKEY', credentialId: f.credential.id, sourceSessionHash: digest(f.sessionToken), securityVersion: 1,
+    webauthnVerifiedAt: new Date(), expiresAt: new Date(Date.now() + 120_000) } });
+  const pairing = await mobile.startPairing(f.sessionToken, proof.id, grant.grant);
+  const approval = key(); const auth = key();
+  const candidate = await mobile.candidate(pairing.pairingToken, { label: 'TEST-ONLY candidate', approvalPublicJwk: approval.publicJwk,
+    authPublicJwk: auth.publicJwk, approvalAttestation: ['TEST-ONLY'], authAttestation: ['TEST-ONLY'] }, `pairing-status-${f.user.id}`);
+  await mobile.provePairing(pairing.pairingToken, candidate.challengeId, approval.proof(candidate.signingInput), auth.proof(candidate.signingInput));
+  const status = async () => {
+    const challenge = await mobile.deviceChallenge(candidate.deviceId, `status-${f.user.id}`);
+    return mobile.deviceStatus(challenge.challengeId, auth.proof(challenge.signingInput));
+  };
+  return { ...f, pairing, candidate, candidateAuth: auth, status };
+}
+
+test('signed device status retires expired or cancelled pairing candidates so the phone can pair again', async () => {
+  for (const reason of ['expired', 'cancelled', 'policy-changed'] as const) {
+    const f = await pendingPairing();
+    if (reason === 'expired') await db.pairingRequest.update({ where: { id: f.pairing.pairingId }, data: { expiresAt: new Date(0) } });
+    else if (reason === 'cancelled') await db.pairingRequest.update({ where: { id: f.pairing.pairingId }, data: { status: 'CANCELLED' } });
+    else await db.user.update({ where: { id: f.user.id }, data: { securityVersion: { increment: 1 } } });
+    assert.deepEqual(await f.status(), { deviceId: f.candidate.deviceId, status: 'REVOKED' });
+    const retired = await db.mobileDevice.findUniqueOrThrow({ where: { id: f.candidate.deviceId } });
+    assert.equal(retired.status, 'REVOKED'); assert.ok(retired.revokedAt);
+    await assert.rejects(mobile.confirmPairing(f.sessionToken, f.pairing.pairingId, f.candidate.deviceId, f.candidate.confirmationCode));
+    assert.equal((await db.mobileDevice.findUniqueOrThrow({ where: { id: f.device.id } })).status, 'ACTIVE');
+  }
+});
+
+test('candidate status requires its device proof, is single-use and keeps live pairing intact', async () => {
+  const f = await pendingPairing();
+  const challenge = await mobile.deviceChallenge(f.candidate.deviceId, 'status-proof');
+  await assert.rejects(mobile.deviceStatus(challenge.challengeId, f.auth.proof(challenge.signingInput)));
+  const proof = f.candidateAuth.proof(challenge.signingInput);
+  assert.equal((await mobile.deviceStatus(challenge.challengeId, proof)).status, 'AWAITING_PC_CONFIRMATION');
+  await assert.rejects(mobile.deviceStatus(challenge.challengeId, proof));
+  assert.equal((await db.mobileDevice.findUniqueOrThrow({ where: { id: f.candidate.deviceId } })).status, 'AWAITING_PC_CONFIRMATION');
+});
+
+test('device status racing valid PC confirmation never retires the confirmed phone', async () => {
+  const f = await pendingPairing();
+  const [status] = await Promise.all([
+    f.status(), mobile.confirmPairing(f.sessionToken, f.pairing.pairingId, f.candidate.deviceId, f.candidate.confirmationCode),
+  ]);
+  assert.ok(['ACTIVE', 'AWAITING_PC_CONFIRMATION'].includes(status.status));
+  await db.pairingRequest.update({ where: { id: f.pairing.pairingId }, data: { expiresAt: new Date(0) } });
+  assert.deepEqual(await f.status(), { deviceId: f.candidate.deviceId, status: 'ACTIVE' });
+});
+
+test('device status cannot return stale ACTIVE after revocation committed during proof verification', async () => {
+  const f = await fixture();
+  const challenge = await mobile.deviceChallenge(f.device.id, 'status-revocation');
+  let entered!: () => void; let release!: () => void;
+  const acquired = new Promise<void>(resolve => { entered = resolve; });
+  const proceed = new Promise<void>(resolve => { release = resolve; });
+  const original = policy.lockUser.bind(policy);
+  const isolatedPolicy = new SessionPolicyService(db);
+  isolatedPolicy.lockUser = async (tx, id) => { entered(); await proceed; return original(tx, id); };
+  const isolatedMobile = new MobileService(db, isolatedPolicy, new AuthService(db, isolatedPolicy), fixtureAttestation);
+  const status = isolatedMobile.deviceStatus(challenge.challengeId, f.auth.proof(challenge.signingInput));
+  await acquired;
+  try {
+    await db.mobileDevice.update({ where: { id: f.device.id }, data: { status: 'REVOKED', revokedAt: new Date(), version: { increment: 1 } } });
+  } finally { release(); }
+  assert.deepEqual(await status, { deviceId: f.device.id, status: 'REVOKED' });
+});

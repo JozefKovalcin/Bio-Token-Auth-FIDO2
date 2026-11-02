@@ -23,6 +23,8 @@ Bez zapnutého B zostáva pôvodný režim A dostupný podľa politiky účtu. T
 
 Postup zostavenia, konfigurácie dôveryhodného originu a inštalácie APK je v `apps/android/README.md`. Použite známy podpisový certifikát aplikácie; jeho SHA-256 odtlačok sa konfiguruje na serveri. Privátny podpisový kľúč APK ani Android Keystore kľúče nepatria do repozitára.
 
+Pred skenovaním QR použite v Android aplikácii **Overiť spojenie so serverom**. Kontrola funguje aj pri vypnutom C a rozlíši DNS, TLS/hostname, timeout, spojenie a neplatnú odpoveď API bez zobrazovania surových výnimiek. `REACHABLE` znamená iba dôveryhodné HTTPS a verejný health endpoint; nepotvrdzuje splnenie C brány. Nemeňte trust profil ani origin podľa QR ako riešenie chyby.
+
 Verifier v `infra/attestation` používa oficiálnu Android knižnicu na overenie hardvérovej atestácie a certifikačných revokácií. Vyžaduje dostupnosť dôveryhodných revokačných údajov; ich výpadok nesmie viesť k prijatiu neovereného kľúča. Verifier je interný, jeho port nepublikujte. `ATTESTATION_SERVICE_TOKEN` je náhodné lokálne tajomstvo zdieľané iba API a verifierom.
 
 Nastavte `ATTESTATION_PACKAGE_NAME`, `ATTESTATION_SIGNING_CERT_SHA256` a prípadne minimálnu verziu aplikácie podľa skutočného APK. Vývojový certifikát ani vlastnosti telefónu nemožno odhadnúť zo vzorových hodnôt. Spustenie verifiera:
@@ -47,6 +49,8 @@ Zaznamenajte dátum, verziu aplikácie/servera, model a firmware YubiKey, PC OS/
 - Na účte s povoleným iba C overte odmietnutie A, B a starých slabších relácií. Samotný YubiKey, telefón alebo QR nestačí.
 
 ## Obnova a prevádzka
+
+Ak nepotvrdené párovanie vyprší, je zrušené novým pokusom alebo prestane zodpovedať bezpečnostnej verzii účtu, telefón použije **Overiť stav zariadenia/potvrdenie**. Server po jednorazovom podpísanom device-auth dôkaze pod rovnakým account lockom ako PC potvrdenie odvolá iba neaktívneho kandidáta bez živého párovania a vráti `REVOKED`. Používateľ potom môže vedome odstrániť jeho miestne kľúče a začať nové kontrolované párovanie. Aktívny telefón sa neodvoláva len preto, že pôvodná pairing výzva vypršala. Sieťová chyba ani neznámy stav neoprávňujú lokálne vymazanie uložených kľúčov. Web odstráni expirovaný potvrdzovací formulár aj po zobrazení kandidáta; Android po expirácii súhlasu neodosiela oneskorený podpis.
 
 Záložný kľúč aj telefón pripravte pred stratou faktorov. Odvolanie posledného potrebného faktora je bezpečne odmietnuté; systém automaticky nezapne A/B. Samoobslužná obnova cez e-mail nie je dostupná.
 

@@ -273,13 +273,32 @@ export class MobileService {
     if (!challenge || challenge.purpose !== 'DEVICE_STATUS' || challenge.consumedAt || challenge.expiresAt <= new Date() || !challenge.deviceId) throw invalid();
     const device = await this.db.mobileDevice.findUnique({ where: { id: challenge.deviceId } });
     if (!device) throw invalid();
-    const user = await this.db.user.findUnique({ where: { id: device.userId }, select: { disabled: true } });
-    if (!user || user.disabled) throw invalid();
     await this.auth.limit(`mobile-proof:${device.id}`, 30);
     await verifyMobileJws(proofJws, challenge.signingInput, device.authPublicJwk);
-    const changed = await this.db.mobileChallenge.updateMany({ where: { id: challenge.id, purpose: 'DEVICE_STATUS', consumedAt: null, expiresAt: { gt: new Date() } }, data: { consumedAt: new Date() } });
-    if (changed.count !== 1) throw conflict();
-    return { deviceId: device.id, status: device.status };
+    // An authenticated device status may authorize local key removal. Serialize it with PC confirmation
+    // and revocation, and read the current device state only after acquiring the account lock.
+    return this.db.$transaction(async tx => {
+      const user = await this.policy.lockUser(tx, device.userId);
+      const current = await tx.mobileDevice.findUnique({ where: { id: device.id } });
+      if (!current || current.userId !== user.id) throw invalid();
+      const changed = await tx.mobileChallenge.updateMany({ where: { id: challenge.id, deviceId: current.id,
+        purpose: 'DEVICE_STATUS', consumedAt: null, expiresAt: { gt: new Date() } }, data: { consumedAt: new Date() } });
+      if (changed.count !== 1) throw conflict();
+      if (['CANDIDATE', 'AWAITING_PC_CONFIRMATION'].includes(current.status)) {
+        const livePairing = await tx.pairingRequest.findFirst({ where: { userId: user.id, pendingDeviceId: current.id,
+          securityVersion: user.securityVersion, status: { in: ['CANDIDATE', 'AWAITING_PC_CONFIRMATION'] }, expiresAt: { gt: new Date() } }, select: { id: true } });
+        if (!livePairing) {
+          await tx.mobileDevice.update({ where: { id: current.id }, data: {
+            status: 'REVOKED', revokedAt: new Date(), version: { increment: 1 },
+          } });
+          await tx.pairingRequest.updateMany({ where: { userId: user.id, pendingDeviceId: current.id,
+            status: { in: ['PENDING', 'CANDIDATE', 'AWAITING_PC_CONFIRMATION'] } }, data: { status: 'CANCELLED' } });
+          await audit(tx, user.id, 'pairing.candidate_retired', { deviceId: current.id });
+          return { deviceId: current.id, status: 'REVOKED' };
+        }
+      }
+      return { deviceId: current.id, status: current.status };
+    });
   }
 
   private async browserTransaction(raw?: string, client: Database | Tx = this.db) {

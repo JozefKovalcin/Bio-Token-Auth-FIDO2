@@ -1,5 +1,20 @@
 # Pokračovanie na druhom zariadení
 
+## Rozsah školského dema a finálne doladenie webu — 2. november 2026
+
+Používateľ chce školskú úlohu A/B/C; obnova účtov a produkčný hosting sa teraz neimplementujú. Začnite [návodom pre notebook](demo-quickstart.md), ktorý má konkrétne príkazy a poradie skúšok. Web bol doladený vizuálne aj funkčne: režimové texty a kroky, registrácia z B/C, návraty/zrušenie, konzistentné karty/tlačidlá/checkboxy, kandidátske a politické akcie. Najnovšie browserové overenie je **7/7 PASS**, build a TypeScript PASS; fyzické C sa tým nenahrádza. Pri ďalšej práci nerozširujte školské zadanie o recovery alebo verejný cloud. Zachovajte oba skutočné faktory C a existujúce trust brány.
+
+## Pokračovanie C — 2. november 2026
+
+Aktuálny `main` `c12736f` bol načítaný fast-forward na pôvodnom PC. Používateľ potvrdil, že teraz nemá telefón ani token a chce pokračovať softvérovo. Nasledujúce zmeny nadväzujú na implementáciu a fyzické B nižšie; nevydávajú sa za fyzické C.
+
+- Android má pred QR kontrolu spojenia s pevným HTTPS originom: tlačidlo **Overiť spojenie so serverom**, bezpečné kódy DNS/TLS/hostname/timeout/HTTP, bez cookies, QR a autorizácie. Toto je prvý krok pri pokračovaní predchádzajúcej nejasnej HTTPS chyby telefónu. `REACHABLE` nepotvrdzuje biometriu ani atestáciu.
+- Vypršaný podpisový súhlas má stav `EXPIRED`; neskorý biometrický callback sa neodosiela. Uložené párované kľúče sa zachovávajú. Kandidát bez živého párovania je po autorizovanej kontrole stavu serverom bezpečne odvolaný; používateľ môže potom explicitne odstrániť jeho miestne kľúče a opakovať pairing. Aktívny telefón zostáva nedotknutý.
+- Web po vypršaní zruší aj formulár už zobrazeného kandidáta. API číta odpovede interného verifiera s reálnymi byte limitmi a pred zápisom kandidáta overí úplný serverový evidence kontrakt.
+- Aktuálne softvérové kontroly: **64/64 serverových, 5/5 browserových, 25/25 Android JVM testov**, build API/web a Android aplikácie/test APK, formátovanie, OpenAPI a lint PASS (0 chýb/40 upozornení). Podrobnosti a hranice sú vo [verification.md](verification.md). Device/Compose ani celý C tok sa na tomto PC nespúšťali.
+
+Nasleduje overenie nového APK na testovacom telefóne, presná kontrola jeho podpisovej identity a sieťová diagnostika, potom existujúci offline biometrický test a skutočné C párovanie podľa brány v `modes-b-c.md`. APK z pôvodného PC môže mať iný debug signer než aplikácia na druhom PC; neodinštalovať spárovanú aplikáciu ani neposielať privátny signing kľúč ako skratku. Lokálna konfigurácia druhého PC zostáva mimo Gitu. B/C predvolené flagy sa touto prácou nezapínajú.
+
 ## Uložený stav po fyzickom B — 19. október 2026
 
 Práca bola na žiadosť používateľa odložená a odoslaná do Gitu. Táto časť opisuje najnovší stav; pôvodný odovzdávací návod nižšie zachytáva východiskový stav pred týmto overením. Presné výsledky a hranice sú v [docs/verification.md](verification.md).

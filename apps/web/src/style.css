@@ -228,12 +228,36 @@ button, select, summary { cursor: pointer; }
   .hero-line[data-typing="true"]::after { display: none; }
   .shell::before { transform: none; }
 }
-.mode-selector { display: flex; gap: 8px; margin-block: 16px; }
-.panel .mode-selector button { flex: 1; min-width: 0; padding-inline: 10px; margin-top: 0; }
-.mode-selector button[aria-pressed="true"] { outline: 2px solid currentColor; outline-offset: 2px; }
-.security-panel { border-top: 1px solid #d9dce0; margin-top: 20px; padding-top: 12px; }
-.security-panel fieldset { border: 1px solid #d9dce0; padding: 12px; margin-top: 20px; }
-.security-panel .mode-choice { display: flex; align-items: center; gap: 10px; }
-.security-panel .mode-choice input { width: 20px; height: 20px; }
-.security-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding-block: 8px; border-bottom: 1px solid #d9dce0; }
-.security-actions { display: grid; grid-template-columns: 1fr; gap: 4px; }
+.mode-selector { display: flex; gap: 8px; margin-block: 20px 24px; padding: 5px; border: 1px solid var(--line); border-radius: 14px; background: var(--paper); }
+.panel .mode-selector button { flex: 1; min-width: 0; min-height: 44px; padding: 8px 4px; margin: 0; border-color: transparent; border-radius: 9px; font-size: 14px; }
+.panel .mode-selector button[aria-pressed="true"] { color: var(--bone); background: var(--pine); border-color: var(--brass-strong); box-shadow: 0 2px 4px #0001; }
+.panel button:disabled { cursor: not-allowed; }
+.panel .secondary-button:disabled, .panel .text-button:disabled { color: var(--muted); background: transparent; border-color: var(--line); opacity: .55; }
+.panel button[aria-busy="true"] { cursor: progress; }
+.panel .security-toggle { font-size: 14px; padding-inline: 12px; }
+.security-panel { border-top: 1px solid var(--line); margin-top: 24px; padding-top: 4px; }
+.security-content { display: grid; gap: 18px; margin-top: 20px; }
+.security-section { min-width: 0; padding: 18px; border: 1px solid var(--line); border-radius: 12px; background: #fffdf85c; }
+.security-section h3 { margin: 0 0 12px; font-size: 16px; font-weight: 600; line-height: 1.4; }
+.security-section .hint { margin-bottom: 12px; font-size: 14px; }
+.panel .security-section label { margin-top: 12px; }
+.security-panel fieldset { min-width: 0; margin: 0; padding: 14px 18px; border: 1px solid var(--line); border-radius: 12px; }
+.security-panel legend { padding-inline: 6px; font-size: 14px; font-weight: 600; }
+.panel .security-panel .mode-choice { display: flex; align-items: center; gap: 10px; min-height: 44px; margin: 0; cursor: pointer; }
+.panel .security-panel .mode-choice input { flex: 0 0 20px; width: 20px; height: 20px; margin: 0; padding: 0; accent-color: var(--brass-strong); }
+.security-item { display: flex; align-items: center; justify-content: space-between; gap: 8px 12px; flex-wrap: wrap; padding-block: 10px; border-bottom: 1px solid var(--line); font-size: 14px; }
+.security-item > span { flex: 1 1 130px; min-width: 0; overflow-wrap: anywhere; }
+.security-item-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.panel .security-item button { width: auto; min-height: 44px; margin: 0; padding: 8px 10px; font-size: 14px; }
+.panel .destructive-button { color: var(--error); }
+.panel .destructive-button:hover:not(:disabled) { color: var(--error); background: var(--error-paper); }
+.security-actions { display: grid; gap: 10px; margin-top: 14px; }
+.panel .security-actions button { margin: 0; font-size: 14px; padding-inline: 12px; }
+.security-section > .secondary-button { font-size: 14px; margin-top: 16px; padding-inline: 12px; }
+.security-confirmation { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); }
+.comparison-code { display: block; margin-block: 10px; font-family: var(--font-mono); overflow-wrap: anywhere; }
+.security-status { margin: 0; padding: 12px 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--brass-wash); font-size: 14px; }
+.security-content > button { margin-top: 0; }
+.advanced-auth > .hint { font-size: 14px; }
+@media (min-width: 901px) { .visual { position: sticky; top: 32px; height: calc(100svh - 64px); align-self: start; } }
+@media (max-width: 400px) { .security-section { padding: 14px; } .panel .security-toggle { padding-inline: 8px; } }

@@ -4,6 +4,7 @@ import android.security.keystore.KeyPermanentlyInvalidatedException
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import java.io.IOException
+import java.time.Instant
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
@@ -18,6 +19,7 @@ import sk.biotoken.core.ApprovalRequest
 import sk.biotoken.core.DeviceChallengeRequest
 import sk.biotoken.core.DeviceKeyOperations
 import sk.biotoken.core.HttpMobileApi
+import sk.biotoken.core.HttpServiceConnectivity
 import sk.biotoken.core.JwsSigning
 import sk.biotoken.core.LoginDetails
 import sk.biotoken.core.MobileApi
@@ -29,11 +31,14 @@ import sk.biotoken.core.PairingCandidateRequest
 import sk.biotoken.core.PairingProveRequest
 import sk.biotoken.core.PairingResolveRequest
 import sk.biotoken.core.ProofRequest
+import sk.biotoken.core.ServiceConnectionResult
+import sk.biotoken.core.ServiceConnectivity
 import sk.biotoken.core.StoredDevice
 import sk.biotoken.core.TrustedService
 
 enum class Screen {
     HOME,
+    CHECKING_CONNECTION,
     SCANNING_PAIRING,
     SCANNING_LOGIN,
     LOADING,
@@ -44,6 +49,7 @@ enum class Screen {
     SUBMITTING,
     APPROVED,
     REJECTED,
+    EXPIRED,
     ERROR,
     KEY_INVALIDATED,
     REVOKED
@@ -56,7 +62,8 @@ data class ApprovalUiState(
     val username: String = "",
     val confirmationCode: String = "",
     val expiresAt: String = "",
-    val message: String = ""
+    val message: String = "",
+    val connectionResult: ServiceConnectionResult? = null
 )
 
 data class SigningOperation(val id: String, val aliasPrefix: String, val signingInput: String)
@@ -69,7 +76,9 @@ class ApprovalViewModel(
     private val keys: DeviceKeyOperations,
     private val store: PairedDeviceStore,
     private val api: MobileApi = HttpMobileApi(service),
-    private val platformDispatcher: CoroutineDispatcher = Dispatchers.IO
+    private val platformDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val connectivity: ServiceConnectivity = HttpServiceConnectivity(service),
+    private val now: () -> Instant = Instant::now
 ) : ViewModel() {
     private val mutableState = MutableStateFlow(ApprovalUiState(serviceOrigin = service.origin))
     val state = mutableState.asStateFlow()
@@ -82,6 +91,14 @@ class ApprovalViewModel(
 
     init {
         mutableState.update { it.copy(devicePresent = device != null) }
+    }
+
+    fun checkConnection() {
+        if (state.value.screen != Screen.HOME || work?.isActive == true || activeSignature != null) return
+        execute(Screen.CHECKING_CONNECTION) {
+            val result = connectivity.check()
+            mutableState.update { it.copy(screen = Screen.HOME, connectionResult = result) }
+        }
     }
 
     fun scan(pairing: Boolean) {
@@ -154,7 +171,9 @@ class ApprovalViewModel(
             "ACTIVE" -> mutableState.update {
                 it.copy(screen = Screen.HOME, message = "Telefón je aktívny. Môžete naskenovať prihlásenie.")
             }
-            "REVOKED" -> mutableState.update { it.copy(screen = Screen.REVOKED, message = "Zariadenie bolo na serveri odvolané.") }
+            "REVOKED" -> mutableState.update {
+                it.copy(screen = Screen.REVOKED, message = "Zariadenie bolo odvolané alebo jeho párovanie nebolo dokončené.")
+            }
             "CANDIDATE", "AWAITING_PC_CONFIRMATION" -> mutableState.update {
                 it.copy(screen = Screen.WAITING_PC, confirmationCode = paired.confirmationCode)
             }
@@ -189,11 +208,11 @@ class ApprovalViewModel(
         if (activeSignature != null) return null
         val operation = when (state.value.screen) {
             Screen.PAIRING_CONSENT -> pairing?.let { pending ->
-                service.requireFresh(pending.candidate.expiresAt)
+                if (!consentIsFresh(pending.candidate.expiresAt)) return null
                 SigningOperation(UUID.randomUUID().toString(), pending.prefix, pending.candidate.signingInput)
             }
             Screen.DETAILS -> details?.let { pending ->
-                service.requireFresh(pending.expiresAt)
+                if (!consentIsFresh(pending.expiresAt)) return null
                 SigningOperation(UUID.randomUUID().toString(), requireNotNull(device).keyAliasPrefix, pending.signingInput)
             }
             else -> null
@@ -205,11 +224,13 @@ class ApprovalViewModel(
 
     fun signatureSucceeded(operation: SigningOperation, approvalJws: String) {
         if (activeSignature?.id != operation.id) return
+        val expiresAt = pairing?.candidate?.expiresAt ?: details?.expiresAt ?: return
+        if (!consentIsFresh(expiresAt)) return
         activeSignature = null
         execute(Screen.SUBMITTING) {
             val enrollment = pairing
             if (enrollment != null) {
-                service.requireFresh(enrollment.candidate.expiresAt)
+                if (!consentIsFresh(enrollment.candidate.expiresAt)) return@execute
                 val auth = withContext(platformDispatcher) { keys.signRequest(enrollment.prefix, operation.signingInput) }
                 val result = api.pairingProve(
                     PairingProveRequest(
@@ -229,7 +250,7 @@ class ApprovalViewModel(
                 }
             } else {
                 val pending = requireNotNull(details)
-                service.requireFresh(pending.expiresAt)
+                if (!consentIsFresh(pending.expiresAt)) return@execute
                 val result = api.approve(ApprovalRequest(pending.challengeId, approvalJws))
                 check(result.status == "APPROVED")
                 clearLogin()
@@ -252,6 +273,8 @@ class ApprovalViewModel(
 
     fun biometricFailed(operation: SigningOperation?, invalidated: Boolean = false) {
         if (operation != null && activeSignature?.id != operation.id) return
+        val expiresAt = pairing?.candidate?.expiresAt ?: details?.expiresAt
+        if (!invalidated && expiresAt != null && !consentIsFresh(expiresAt)) return
         activeSignature = null
         mutableState.update {
             it.copy(
@@ -268,6 +291,26 @@ class ApprovalViewModel(
                 }
             )
         }
+    }
+
+    private fun consentIsFresh(expiresAt: String): Boolean {
+        if (Instant.parse(expiresAt).isAfter(now())) return true
+        activeSignature = null
+        val expiredPairing = pairing
+        pairing = null
+        clearLogin()
+        mutableState.update {
+            it.copy(screen = Screen.EXPIRED, username = "", confirmationCode = "", expiresAt = "", message = "")
+        }
+        // Only uncommitted pairing keys are discarded. Never erase the stored device keys.
+        expiredPairing?.let {
+            try {
+                keys.delete(it.prefix)
+            } catch (_: Exception) {
+                // The expired alias is never reused, even if deletion fails.
+            }
+        }
+        return false
     }
 
     fun home() {

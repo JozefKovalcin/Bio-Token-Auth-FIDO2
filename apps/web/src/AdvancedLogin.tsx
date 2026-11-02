@@ -5,9 +5,10 @@ import { HttpError, readableError, request, type Mode, type UserSession } from '
 type State = { step: 'password' } | { step: 'key'; options?: PublicKeyCredentialRequestOptionsJSON } |
   { step: 'mobile'; qr: string; expiresAt: string; transactionId: string } | { step: 'expired' };
 
-export function AdvancedLogin({ mode, onLogin, activation = false, onActivation }: {
+export function AdvancedLogin({ mode, onLogin, activation = false, onActivation, onStepChange, onBusyChange }: {
   mode: Exclude<Mode, 'A'>; onLogin: (user: UserSession) => void;
   activation?: boolean; onActivation?: (proof: string) => void;
+  onStepChange?: (step: State['step']) => void; onBusyChange?: (busy: boolean) => void;
 }) {
   const [state, setState] = useState<State>({ step: mode === 'B' ? 'password' : 'key' });
   const [username, setUsername] = useState('');
@@ -18,6 +19,8 @@ export function AdvancedLogin({ mode, onLogin, activation = false, onActivation 
   const mounted = useRef(true);
   const operation = useRef(0);
   const mobileRequest = useRef<AbortController | null>(null);
+  useEffect(() => { onStepChange?.(state.step); }, [state.step, onStepChange]);
+  useEffect(() => { onBusyChange?.(busy); return () => onBusyChange?.(false); }, [busy, onBusyChange]);
   useEffect(() => {
     mounted.current = true;
     return () => {
@@ -42,6 +45,7 @@ export function AdvancedLogin({ mode, onLogin, activation = false, onActivation 
         const status = await request<{ state: string }>(`auth/c/status?transactionId=${encodeURIComponent(state.transactionId)}`, undefined, abort.signal);
         if (abort.signal.aborted) return;
         failures = 0;
+        setError('');
         if (status.state === 'APPROVED') {
           const result = await request<UserSession | { activationProofId: string }>('auth/c/complete', { transactionId: state.transactionId }, abort.signal);
           if (!abort.signal.aborted) {
@@ -103,13 +107,13 @@ export function AdvancedLogin({ mode, onLogin, activation = false, onActivation 
       <label htmlFor="b-password">Heslo</label><input id="b-password" type="password" autoComplete="current-password" required maxLength={128} value={password} onChange={event => setPassword(event.target.value)} disabled={busy}/>
       <button disabled={busy}>Overiť heslo</button>
     </form> : null}
-    {state.step === 'key' ? <button disabled={busy} onClick={() => void run(verifyKey)}>{busy ? 'Overujem…' : 'Overiť YubiKey'}</button> : null}
+    {state.step === 'key' ? <><button type="button" disabled={busy} onClick={() => void run(verifyKey)}>{busy ? 'Overujem…' : 'Overiť YubiKey'}</button>{mode === 'B' ? <button className="text-button" type="button" disabled={busy} onClick={() => { setError(''); setState({ step: 'password' }); }}>Znova zadať meno a heslo</button> : null}</> : null}
     {state.step === 'mobile' ? <div className="enrollment"><img src={state.qr} width={220} height={220} alt="Jednorazová požiadavka na schválenie prihlásenia telefónom"/><p role="status">Naskenujte QR spárovanou aplikáciou. Zostáva {seconds} s.</p><button className="text-button" disabled={busy} onClick={() => void run(async () => {
       mobileRequest.current?.abort();
       try { await request('auth/c/cancel', { transactionId: state.transactionId }); }
       finally { if (mounted.current) setState({ step: 'expired' }); }
     })}>Zrušiť prihlásenie</button></div> : null}
-    {state.step === 'expired' ? <button onClick={() => { setError(''); setState({ step: mode === 'B' ? 'password' : 'key' }); }}>Začať znova</button> : null}
+    {state.step === 'expired' ? <button type="button" onClick={() => { setError(''); setState({ step: mode === 'B' ? 'password' : 'key' }); }}>Začať znova</button> : null}
     {error ? <p className="error" role="alert">{error}</p> : null}
   </div>;
 }

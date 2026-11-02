@@ -1,13 +1,13 @@
 # Bio Token Auth
 
-Bio Token Auth je výskumný prototyp viacfaktorového prihlasovania. Obsahuje režim A, implementáciu WebAuthn pre B a C, natívny Android klient a interný verifier Android hardvérovej atestácie. B/C sú predvolene vypnuté do konfigurácie dôvery a potrebného overenia; fyzický YubiKey/Android akceptačný protokol zatiaľ nebol vykonaný.
+Bio Token Auth je výskumný prototyp viacfaktorového prihlasovania. Obsahuje režim A, implementáciu WebAuthn pre B a C, natívny Android klient a interný verifier Android hardvérovej atestácie. B má zaznamenanú fyzickú registráciu a prihlásenie s YubiKey; celý Android/C akceptačný protokol ešte neprebehol. B/C sú v predvolenej konfigurácii vypnuté do nastavenia dôvery a potrebného overenia.
 
 ## Režimy prihlasovania
 
 | Režim | Postup | Stav |
 | --- | --- | --- |
 | A | Používateľské meno a heslo; po aktivácii aj jednorazový kód TOTP | Implementovaný |
-| B | Používateľské meno a heslo, potom YubiKey cez WebAuthn | API/web a automatické testy; vyžaduje trust konfiguráciu a fyzické overenie |
+| B | Používateľské meno a heslo, potom YubiKey cez WebAuthn | Fyzická registrácia a základné prihlásenie PASS; rozsah negatívnych skúšok uvádza záznam overenia |
 | C | YubiKey cez USB, QR požiadavka a biometricky autorizovaný podpis v telefóne | API/web/Android/verifier; predvolene vypnutý, fyzické MFA neoverené |
 
 V režime A sa TOTP nastavuje v účte po registrácii. Po aktivácii ho server vyžaduje pri každom ďalšom prihlásení. B/C vyžadujú stabilný DNS hostname, dôveryhodné HTTPS a explicitnú serverovú politiku. C viaže oba faktory na jednu transakciu a vydáva session iba pôvodnému PC. Podrobnosti konfigurácie, aktivácie a fyzických kontrol sú v [návode B/C](docs/modes-b-c.md).
@@ -26,6 +26,8 @@ Nová migrácia odvolá historické relácie bez faktorových dôkazov; použív
 Web používa fotografiu trezorových dverí `pexels-cottonbro-8466227.jpg`. QR kód TOTP sa vytvára lokálne a možno ho pridať do kompatibilnej autentifikačnej aplikácie.
 
 ## Spustenie v lokálnej sieti
+
+Pre školskú úlohu začnite [stručným postupom spustenia a skúšky A/B/C na notebooku](docs/demo-quickstart.md). Obsahuje príkazy pre existujúcu aj novú inštanciu, Android APK a poradie skúšok. Obnova účtov a produkčný hosting sú mimo rozsahu školského dema.
 
 Na počítači, ktorý bude serverom, otvorte PowerShell v hlavnom priečinku projektu. Zistite jeho IPv4 adresu príkazom `ipconfig` a nahraďte ňou príklad `192.168.1.50`:
 

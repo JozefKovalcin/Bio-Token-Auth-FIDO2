@@ -63,7 +63,8 @@ class MainActivity : FragmentActivity() {
                         onReject = model::reject,
                         onRefresh = model::refreshDevice,
                         onHome = model::home,
-                        onForget = model::forgetRevoked
+                        onForget = model::forgetRevoked,
+                        onCheckConnection = model::checkConnection
                     )
                 }
             }

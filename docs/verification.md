@@ -1,5 +1,37 @@
 # Záznam overenia
 
+## 2. november 2026 — doladenie webu pre školské demo
+
+Používateľ spresnil rozsah: školská úloha A/B/C, bez požiadavky na obnovu účtov a produkčný hosting. Pridaný [návod pre notebook](demo-quickstart.md); nemení bezpečnostné požiadavky jednotlivých režimov.
+
+Web má konzistentné prepínače, sekundárne/deštruktívne tlačidlá, karty správy faktorov a checkboxy bez zdedených rozmerov textových polí. Hero, hlavička a priebeh zodpovedajú A/B/C. Registrácia je dostupná aj z B/C a vracia sa do A; TOTP sa dá zrušiť. Aktivácia kandidátskeho kľúča má jedinú funkčnú akciu; párovanie možno vedome nahradiť novým tokom a politika sa neukladá bez zmeny či požadovaného dôkazu C.
+
+Overenie: web aj API TypeScript PASS, Vite production build PASS (existujúce neblokujúce lucide `use client` upozornenia), OpenAPI 41 ciest PASS, **7/7 browserových testov PASS**, whitespace PASS. Nové regresie pokrývajú registráciu z C, zobrazenie hesla, návrat do A, jedinú aktiváciu kandidáta, predpoklady párovania/politiky a mobilné checkboxy. Vizuálne skontrolované testové obrazovky cez Chromium na desktope 1440×1000 a mobile 390×844; kontrola 360px mobilu tiež bez horizontálneho pretekania. Použité boli výhradne testové API/účty; fyzické MFA to nepotvrdzuje.
+
+Serverových 64/64 a Android JVM 25/25 z predchádzajúcej časti sú výsledky toho istého dňa pred čisto webovým doladením; ich kód sa pri tomto doladení nemenil a testy sa zbytočne neopakovali. APK zostáva lokálny výstup, na notebooku sa zostaví podľa jeho signing setupu. Fyzické C zostáva úlohou notebookového overenia.
+
+## 2. november 2026 — softvérové pokračovanie C na pôvodnom PC
+
+Východisko: `main` fast-forward na `c12736f`. Používateľ výslovne potvrdil pôvodné PC bez telefónu a tokenu; fyzické výsledky B z druhého pracoviska nižšie sa neopakovali ani nerozširujú na C. Lokálny `.env` tu nie je. Zmeny nevyžadujú novú migráciu a nezapínajú C gate.
+
+Implementované a nezávisle zreviewované: serverové ukončenie neaktívneho kandidáta bez živého párovania cez jednorazový device-auth dôkaz; atomické čítanie stavu s PC potvrdením/revokáciou; ochrana aktívneho zariadenia; striktné streamové limity interného verifiera a validačná hranica jeho evidence. Android dostal explicitnú pred-QR HTTPS diagnostiku a stav expirácie podpisového súhlasu; web potvrdzovací formulár nezostane aktívny po expirácii párovania. Agentové review nie je hardvérová certifikácia.
+
+| Kontrola tohto behu | Výsledok |
+| --- | --- |
+| `docker compose -f compose.test.yaml up --build --abort-on-container-exit --exit-code-from tests` | PASS: build API/web, obe migrácie v dočasnom PostgreSQL, TypeScript API/web, **64/64 testov**, 0 skipped; potom testovacie `down` |
+| `node --import tsx --test tests/mobile-attestation.test.ts` | PASS **7/7**, zahrnuté aj v 64 vyššie; interný HTTP fixture, nie fyzická atestácia |
+| `node node_modules/@playwright/test/cli.js test` | PASS **5/5**, vrátane expirácie po zobrazení pairing kandidáta; virtuálny autentifikátor a testové API |
+| `node scripts/check-contract.mjs` | PASS, OpenAPI 41 ciest |
+| Android úzke `spotlessApply :core:test :app:testDebugUnitTest` | PASS **15 core + 10 app = 25/25**, 0 failures/0 skipped |
+| `./apps/android/scripts/Verify-Android.ps1 -ServiceOrigin https://auth.bio-token.test` | PASS: Spotless, JVM tasky, lint, debug APK aj instrumentation APK; 95 taskov, lint 0 chýb/40 upozornení |
+| `git diff --check` | PASS |
+
+Nové serverové regresie overujú expiráciu/zrušenie/zmenu politiky kandidáta, chybný či opakovaný device proof, súbeh s PC potvrdením a stav po revokácii. Bridge testy overujú byte limity aj pri chunked/klamlivej `Content-Length`, zrušenie streamu, neúplnú/software evidence, sanitizáciu a cache invalidáciu. Android sieťové testy používajú lokálne TLS certifikáty a overujú odmietnutie neznámej CA aj nesprávneho hostname; state holder testy chránia uložené kľúče a odmietajú neskorý podpis po expirácii. Nový Compose test je iba zostavený, na zariadení nebežal.
+
+Počas prípravy testov Docker Desktop nedokázal odstrániť starý `userAnalyticsOtlpHttp.sock` (`ERROR_CANT_ACCESS_FILE`). Po overení, že Docker procesy nebežia a `run` obsahuje iba tento nulový socket, bol pôvodný runtime priečinok zachovaný ako `%LOCALAPPDATA%/Docker/run-stale-20261102-bio`. Docker vytvoril nový `run`; `docker info` potvrdilo Linux engine a izolované testy prešli. DB volumes, konfigurácia a ostatné Docker dáta sa nemažú; záloha starého runtime zostala lokálna.
+
+**Nevykonané v tomto behu:** device/Compose testy, offline odtlačok, HTTPS na Xiaomi, úspešná mobilná hardvérová atestácia, C pairing/trial/prihlásenie a negatívne hardvérové scenáre. JVM verifier sa nemenil a jeho historické testy sa znovu nevydávajú za aktuálny beh. Nový Android APK je lokálny artefakt; pred nasadením treba porovnať signer so skutočne inštalovanou aplikáciou. Nasledujúce kroky sú v [odovzdávacom návode](handoff-next-device.md).
+
 ## 19. október 2026 — nové Windows pracovisko, priebežná akceptácia
 
 **Stav pri odložení práce na žiadosť používateľa:** B má nižšie uvedené fyzické výsledky PASS; C je stále vypnuté a fyzicky nevykonané. Projektové Compose služby boli zastavené cez `docker compose --profile mode-c down` bez `-v`, lokálny vlastný CoreDNS zastavený, aplikácia na telefóne zavretá bez mazania dát a projektový ADB server ukončený. Gradle `--stop` hlásil, že nebeží žiadny daemon. Projektová karta a zostávajúce prázdne Chrome karty boli zavreté. Databáza, CA, `.env`, lokálne nástroje a artefakty zostávajú zachované a ignorované Gitom. Telefón bol potrebné vrátiť na Wi-Fi DHCP po zastavení lokálneho DNS; používateľ dostal pokyn, vykonanie nepotvrdené. Miesto pokračovania je na začiatku [odovzdávacieho návodu](handoff-next-device.md).

@@ -37,6 +37,8 @@ function App() {
   const [enrollment, setEnrollment] = useState<Enrollment | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [busy, setBusy] = useState(false);
+  const [advancedBusy, setAdvancedBusy] = useState(false);
+  const [advancedStep, setAdvancedStep] = useState<'password' | 'key' | 'mobile' | 'expired'>('password');
   const [error, setError] = useState('');
   const [expiresAt, setExpiresAt] = useState(0);
   const [remaining, setRemaining] = useState(0);
@@ -87,7 +89,7 @@ function App() {
       count += 1;
       setHeroCharacters(count);
       if (count < heroCharacterCount) {
-        const lineBreak = heroLines.slice(0, -1).reduce((sum, line) => sum + line.length, 0);
+        const lineBreak = heroLines[0].length;
         const secondLineBreak = lineBreak + heroLines[1].length;
         const pause = count === lineBreak || count === secondLineBreak ? 120 : 30;
         timer = window.setTimeout(typeNextCharacter, pause);
@@ -134,15 +136,15 @@ function App() {
     try {
       if (view === 'register') {
         const value = await api<User>('register', { username, password });
-        setPassword(''); setPasswordConfirm(''); setShowPassword(false); setUser(value); setExpiresAt(Date.parse(value.expiresAt)); setView('dashboard');
+        setPassword(''); setPasswordConfirm(''); setShowPassword(false); handleLogin(value);
       } else if (view === 'login') {
         const result = await api<{ step: 'totp' | 'done'; expiresAt?: string; user?: User }>('password', { username, password });
         setPassword(''); setShowPassword(false);
         if (result.step === 'totp') { setExpiresAt(Date.parse(result.expiresAt!)); setView('totp'); }
-        else { setUser(result.user!); setExpiresAt(Date.parse(result.user!.expiresAt)); setView('dashboard'); }
+        else handleLogin(result.user!);
       } else if (view === 'totp') {
         const value = await api<User>('totp', { code });
-        setCode(''); setUser(value); setExpiresAt(Date.parse(value.expiresAt)); setView('dashboard');
+        setCode(''); handleLogin(value);
       }
     } catch (e) { setError(e instanceof Error ? e.message : 'Požiadavka sa nepodarila. Skúste znova.'); }
     finally { setBusy(false); }
@@ -167,12 +169,19 @@ function App() {
   async function logout() {
     setBusy(true); setError('');
     try {
-      await api('logout', {}); setUser(null); setEnrollment(null); setCode(''); setPassword(''); setPasswordConfirm(''); setShowPassword(false); setView('login');
+      await api('logout', {}); setUser(null); setEnrollment(null); setCode(''); setPassword(''); setPasswordConfirm(''); setShowPassword(false); setMode('A'); setView('login');
     } catch (e) { setError(e instanceof Error ? e.message : 'Odhlásenie sa nepodarilo. Skúste znova.'); }
     finally { setBusy(false); }
   }
 
-  const second = view === 'totp' || view === 'setup';
+  const second = view === 'totp' || view === 'setup' || (view === 'login' &&
+    ((mode === 'B' && advancedStep === 'key') || (mode === 'C' && advancedStep === 'mobile')));
+  const displayMode = view === 'register' || view === 'totp' || view === 'setup' ? 'A' : mode;
+  const factorOne = displayMode === 'C' ? 'YubiKey' : 'Heslo';
+  const factorTwo = displayMode === 'A' ? 'Autentifikátor' : displayMode === 'B' ? 'YubiKey' : 'Telefón';
+  const openRegistration = () => {
+    setMode('A'); setView('register'); setPassword(''); setPasswordConfirm(''); setShowPassword(false); setError('');
+  };
   const heading = view === 'register' ? 'Vytvorte si účet.' : view === 'totp' ? 'Potvrďte, že ste to vy.' : view === 'setup' ? 'Dodatočná vrstva zabezpečenia.' : view === 'dashboard' ? `Vitajte, ${user?.username}.` : 'Vitajte späť.';
   const firstCurrent = !second && view !== 'dashboard';
   const firstComplete = second || view === 'dashboard';
@@ -192,23 +201,24 @@ function App() {
             {emphasisStart < 0 ? visible : <>{visible.slice(0, emphasisStart)}<em>{visible.slice(emphasisStart, emphasisStart + 'bezpečné'.length)}</em>{visible.slice(emphasisStart + 'bezpečné'.length)}</>}
           </span>;
         })}</h1>
-        <div className="photo-footer" data-intro-complete={heroCharacters === heroCharacterCount} aria-label="Dva faktory overenia"><div><span>01</span><p>Heslo</p></div><div><span>02</span><p>Autentifikačná aplikácia</p></div></div>
+        <div className="photo-footer" data-intro-complete={heroCharacters === heroCharacterCount} aria-label="Dva faktory overenia"><div><span>01</span><p>{factorOne}</p></div><div><span>02</span><p>{displayMode === 'A' ? 'Autentifikačná aplikácia' : factorTwo}</p></div></div>
       </div>
     </aside>
     <div className="workspace">
-      <header className="topbar"><span className="mode-tag"><strong>Režim {mode}</strong><span>{mode === 'A' ? 'Heslo + TOTP' : mode === 'B' ? 'Heslo + YubiKey' : 'YubiKey + telefón'}</span></span></header>
+      <header className="topbar"><span className="mode-tag"><strong>Režim {displayMode}</strong><span>{displayMode === 'A' ? 'Heslo + TOTP' : displayMode === 'B' ? 'Heslo + YubiKey' : 'YubiKey + telefón'}</span></span></header>
       <main className="main">
         <div className="form-wrap">
           <ol className="progress" aria-label="Priebeh overenia">
-            <li id="factor-one" className={firstCurrent ? 'current' : firstComplete ? 'complete' : ''} aria-current={firstCurrent ? 'step' : undefined}><span className="step-number">01</span><span>{mode === 'C' ? 'YubiKey' : 'Heslo'}</span></li>
-            <li id="factor-two" className={secondCurrent ? 'current' : secondComplete ? 'complete' : ''} aria-current={secondCurrent ? 'step' : undefined}><span className="step-number">02</span><span>{mode === 'A' ? 'Autentifikátor' : mode === 'B' ? 'YubiKey' : 'Telefón'}</span></li>
+            <li id="factor-one" className={firstCurrent ? 'current' : firstComplete ? 'complete' : ''} aria-current={firstCurrent ? 'step' : undefined}><span className="step-number">01</span><span>{factorOne}</span></li>
+            <li id="factor-two" className={secondCurrent ? 'current' : secondComplete ? 'complete' : ''} aria-current={secondCurrent ? 'step' : undefined}><span className="step-number">02</span><span>{factorTwo}</span></li>
           </ol>
-          <section className="panel" aria-busy={busy} aria-labelledby="auth-title">
+          <section className="panel" aria-busy={busy || advancedBusy} aria-labelledby="auth-title">
         <h2 id="auth-title" ref={title} tabIndex={-1}>{view === 'loading' ? 'Načítavam účet…' : heading}</h2>
         <p className="hint">{view === 'register' ? 'Zvoľte si používateľské meno a heslo. Autentifikátor môžete pridať teraz alebo neskôr v účte.' : view === 'totp' ? 'Otvorte 2FAS, Google Authenticator alebo inú TOTP aplikáciu a zadajte aktuálny šesťmiestny kód.' : view === 'setup' ? 'Naskenujte QR kód v autentifikačnej aplikácii a potvrďte prvý kód.' : view === 'dashboard' ? 'Vyberte si, ako chcete chrániť svoj účet.' : mode === 'A' ? 'Zadajte svoje meno a heslo.' : 'Dokončite všetky kroky zvoleného režimu.'}</p>
 
-        {view === 'login' ? <div className="mode-selector" role="group" aria-label="Prihlasovací režim">{(['A', 'B', 'C'] as Mode[]).map(value => <button className="secondary-button" key={value} type="button" aria-pressed={mode === value} disabled={busy || (value !== 'A' && !capabilities?.modes.includes(value))} onClick={() => { setMode(value); setPassword(''); setError(''); }}>Režim {value}</button>)}</div> : null}
-        {view === 'login' && mode !== 'A' ? <Suspense fallback={<p role="status">Načítavam overenie…</p>}><AdvancedLogin key={mode} mode={mode} onLogin={handleLogin}/></Suspense> : null}
+        {view === 'login' ? <div className="mode-selector" role="group" aria-label="Prihlasovací režim">{(['A', 'B', 'C'] as Mode[]).map(value => <button className="secondary-button" key={value} type="button" aria-pressed={mode === value} disabled={busy || advancedBusy || (value !== 'A' && !capabilities?.modes.includes(value))} title={value !== 'A' && !capabilities?.modes.includes(value) ? 'Tento režim zatiaľ nie je na serveri povolený.' : undefined} onClick={() => { if (value === mode) return; setMode(value); setAdvancedStep(value === 'B' ? 'password' : 'key'); setPassword(''); setError(''); }}>Režim {value}</button>)}</div> : null}
+        {view === 'login' && mode !== 'A' ? <Suspense fallback={<p role="status">Načítavam overenie…</p>}><AdvancedLogin key={mode} mode={mode} onLogin={handleLogin} onStepChange={setAdvancedStep} onBusyChange={setAdvancedBusy}/></Suspense> : null}
+        {view === 'login' && mode !== 'A' && error ? <p className="error" role="alert">{error}</p> : null}
 
         {view === 'loading' ? <p className="loading-status" role="status"><span className="busy-indicator" aria-hidden="true"/>Overujem prihlásenie…</p> : null}
         {(view === 'login' && mode === 'A') || view === 'register' || view === 'totp' ? <form onSubmit={submit}>
@@ -234,13 +244,16 @@ function App() {
           </>}
           {error ? <p className="error" role="alert">{error}</p> : null}
           <button type="submit" disabled={busy} aria-busy={busy}>{busy ? 'Spracúvam…' : view === 'register' ? 'Vytvoriť účet' : view === 'totp' ? 'Overiť a prihlásiť sa' : 'Pokračovať'}<span aria-hidden="true">{busy ? <i className="busy-indicator"/> : '→'}</span></button>
-          {view !== 'totp' ? <button className="text-button" type="button" onClick={() => { setView(view === 'login' ? 'register' : 'login'); setPassword(''); setPasswordConfirm(''); setShowPassword(false); setError(''); }} disabled={busy}>{view === 'login' ? <>Ešte nemáte účet? <span className="link-action">Vytvoriť účet</span></> : <>Už máte účet? <span className="link-action">Prihlásiť sa</span></>}</button> : null}
         </form> : null}
+
+        {view === 'login' ? <button className="text-button" type="button" onClick={openRegistration} disabled={busy || advancedBusy}>Ešte nemáte účet? <span className="link-action">Vytvoriť účet</span></button> : null}
+        {view === 'register' ? <button className="text-button" type="button" onClick={() => { setView('login'); setMode('A'); setPassword(''); setPasswordConfirm(''); setShowPassword(false); setError(''); }} disabled={busy}>Už máte účet? <span className="link-action">Prihlásiť sa</span></button> : null}
+        {view === 'totp' ? <button className="text-button" type="button" onClick={logout} disabled={busy}>Zrušiť prihlásenie</button> : null}
 
         {view === 'dashboard' ? <>
           {user?.mode !== 'A' ? <p role="status">Prihlásenie režimom {user?.mode}: {user?.mode === 'B' ? 'heslo a YubiKey boli overené.' : 'YubiKey a spárovaný telefón boli overené.'}</p> : null}
           <p><strong>TOTP pre režim A</strong></p>
-          <div className="account-card"><span className="account-icon" aria-hidden="true">{user?.totpActive ? '✓' : '01'}</span><div><strong>{user?.totpActive ? 'Dvojité overenie je zapnuté' : 'Heslo chráni váš účet'}</strong><p>{user?.totpActive ? 'Pri ďalšom prihlásení zadajte aj kód z autentifikátora.' : 'Pridajte TOTP pre silnejšiu ochranu. Môžete to spraviť teraz alebo neskôr.'}</p></div></div>
+          <div className="account-card"><span className="account-icon" aria-hidden="true">{user?.totpActive ? '✓' : '01'}</span><div><strong>{user?.totpActive ? 'TOTP je zapnuté' : 'TOTP ešte nie je zapnuté'}</strong><p>{user?.totpActive ? 'Pri prihlásení režimom A zadajte aj kód z autentifikátora.' : 'Pridajte autentifikátor ako druhý faktor pre režim A. Môžete to spraviť teraz alebo neskôr.'}</p></div></div>
           {user?.totpActive ? <div className="factor-status"><span className="status-dot"/> AUTENTIFIKÁTOR AKTÍVNY</div> : <button onClick={startSetup} disabled={busy}>{busy ? 'Pripravujem…' : 'Nastaviť TOTP teraz'}<span aria-hidden="true">→</span></button>}
           {error ? <p className="error" role="alert">{error}</p> : null}
           <button className="text-button" type="button" onClick={logout} disabled={busy}>Odhlásiť sa</button>

@@ -54,9 +54,17 @@ Oba verejné kľúče a oba atestačné reťazce sa predkladajú backendu; klien
 
 ## Stav a správanie pri prerušení
 
+### Kontrola spojenia pred QR
+
+Domovská obrazovka má výslovné tlačidlo **Overiť spojenie so serverom**, dostupné aj bez spárovania a pri vypnutom C. Aplikácia vykoná iba verejný `GET /api/health` na svojom pevne nakonfigurovanom HTTPS origine, bez cookies, autorizácie, QR, podpisu alebo prenosu účtu. Kontrola nesleduje presmerovania a nemení dôveru TLS.
+
+Výsledok má stabilný bezpečný kód: `DNS_FAILURE`, `TLS_IDENTITY_FAILURE` (identita/hostname), `TLS_FAILURE` (TLS/reťazec), `TIMEOUT`, `CONNECTION_FAILURE`, `HTTP_FAILURE`, `INVALID_RESPONSE` alebo `NETWORK_FAILURE`. Výnimky a obsah odpovedí sa nezobrazujú ani nelogujú. Pri DNS chybe skontrolujte Wi-Fi DNS a Súkromný DNS; pri TLS verejnú LAN CA, hostname, platnosť certifikátu a čas telefónu. `REACHABLE` potvrdzuje iba správnu verejnú odpoveď cez HTTPS z tejto aplikácie; nie je dôkazom atestácie, biometrie ani úspešného C prihlásenia.
+
 Čisté `ApprovalScreen(state, callbacks)` nemá ViewModel, sieť ani kryptografiu. `ApprovalViewModel` vystavuje immutable UI stav cez StateFlow; `MainActivity` koordinuje platformový prompt a kameru. Prompt sa spustí iba výslovným kliknutím. Rotácia/odchod z aplikácie zruší aktívnu operáciu a oneskorený callback sa ignoruje. Obnova procesu obnoví iba uloženú identitu zariadenia, nikdy súhlas, QR ani podpis.
 
 Po chybe počas odosielania aplikácia nevyhlasuje úspech a automaticky nevydáva nový podpis; používateľ overí výsledok na PC a bezpečne začne znova. Zneplatnený biometrický kľúč sa nenahrádza potichu. Zariadenie treba odvolať podľa serverovej politiky a kontrolovane znovu spárovať; miestne kľúče možno vymazať až po autentifikovanom potvrdení odvolania.
+
+Ak výzva vyprší pred podpisom alebo počas biometrického promptu, klient zobrazí samostatný stav expirácie a vymaže čakajúci súhlas/QR z pamäte. Oneskorený callback už nespustí odoslanie. Uložené kľúče spárovaného zariadenia zostanú zachované; odstránia sa iba neuložené dočasné kľúče expirovaného kandidátskeho párovania. Ak server pri autentifikovanej kontrole stavu označí nedokončené, zrušené alebo expirované párovanie ako `REVOKED`, používateľ môže vedome odstrániť jeho miestne kľúče a začať nové párovanie. Neznámy stav servera nikdy neautorizuje vymazanie kľúčov.
 
 ## Požadované fyzické overenie
 

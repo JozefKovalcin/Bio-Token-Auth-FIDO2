@@ -10,13 +10,19 @@ Testy A pokrývajú registráciu/TOTP, limity, replay, expiráciu, cookies a sú
 
 C testy overujú JWS bajty, oddelenie účelov/kľúčov, kandidátske párovanie, kontrolu pôvodného PC, dva faktory, replay, expiráciu, revokáciu, zmenu trust stavu a súbežné rozhodnutie/dokončenie. Ich atestačný fixture provider existuje iba v testoch. HTTP testy overujú oddelenie native a browser rout, Origin, cookies a veľkosť/validitu JSON bez úniku obsahu.
 
+Status zariadenia má regresie pre bezpečné odvolanie expirovaného/zrušeného kandidáta, ochranu aktívneho telefónu, jednorazovosť dôkazu a súbeh s potvrdením/revokáciou. `tests/mobile-attestation.test.ts` overuje skutočné streamové limity odpovedí interného verifiera v bajtoch, nedôveryhodnú `Content-Length`, chybnú evidence, sanitizáciu a revokačnú cache; fetch je tu testová hranica, nie fyzická atestácia.
+
 Regresné testy dopĺňania issuerov vytvárajú dočasnú testovaciu PKI a skutočne podpísanú packed atestáciu cez OpenSSL; lokálny `pnpm test` preto potrebuje aj CLI `openssl` v PATH (Compose test image ho obsahuje). Súkromné testovacie kľúče sa generujú iba v dočasnom priečinku a následne odstránia, nie sú súčasťou Gitu ani runtime konfigurácie. Overuje sa odmietnutie leaf-only reťazca bez poolu, úspech s explicitnými intermediates pod pôvodným rootom, nezmenené podpísané bajty a odmietnutie nesprávnych rootov/issuerov, podpisov, payloadu, UP/UV a chybných poolov. Ani tento kryptografický fixture nenahrádza fyzický YubiKey.
 
 `pnpm test:browser` používa Chromium a virtuálny WebAuthn autentifikátor. API je v týchto UI testoch nahradené testovou hranicou; testuje sa správanie formulárov, skutočné browserové vytvorenie assertion, odmietnutie fallbacku a stale-tab handling. Nejde o fyzický hardvérový test.
 
+Browserová regresia C párovania posunie kontrolovaný čas po zobrazení kandidáta: expirovaný formulár a kód zmiznú bez potvrdenia, nové párovanie je opäť dostupné.
+
 ## Android
 
 Príkazy sú v [Android README](../apps/android/README.md): `spotlessCheck`, `:core:test`, `:app:testDebugUnitTest`, `:app:lintDebug`, `:app:assembleDebug`, `:app:assembleDebugAndroidTest`. Kotlin/Node fixture overuje rovnaké JWS bajty; JVM testy kontrolujú kontrakt, QR, TLS, stav, výslovný súhlas a staré callbacky.
+
+Kontrola spojenia má lokálne TLS testy pre neznámu CA a nesprávny hostname bez obídenia validácie, zakázané redirecty/cookies/autorizáciu, bounded odpoveď a pevné sieťové klasifikácie. State holder testy odlišujú diagnostiku od C autentifikácie, chránia uložené kľúče pri expirácii a povoľujú ich odstránenie až po autorizovanom `REVOKED`. Oneskorený biometrický callback po expirácii nesmie odoslať dôkaz.
 
 Device testy sú samostatné. CI emulator job cielene spúšťa Compose UI test; nepredstiera biometrickú hardvérovú atestáciu. `DeviceKeysTest` vyžaduje dostupnú a zapísanú silnú biometriu a inak test preskočí; jeho preskočenie nikdy nie je úspešná hardvérová akceptácia. Screenshot/bencmark tasky zatiaľ nie sú zavedené.
 
